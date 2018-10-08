@@ -11,6 +11,7 @@ from networkx.drawing.nx_agraph import graphviz_layout
 
 class EventLine(object):
     def __init__(self,**kwargs):
+        # storing data and times in different lists
         self.__eventtime = list()
         self.__eventdata = list()
 
@@ -19,6 +20,10 @@ class EventLine(object):
         self.__store_for_reset = kwargs
         self.__largest_time = 0.
         self.__verbose = kwargs.get("verbose",False)
+
+    # delete everything and reset
+    def reset(self):
+        self.__init__(**self.__store_for_reset)
 
     def addevent(self,time,**kwargs):
         eventID = len(self.__eventtime)
@@ -41,8 +46,6 @@ class EventLine(object):
         
         return self[idx]
     
-    def reset(self):
-        self.__init__(**self.__store_for_reset)
     
     def __getattr__(self,key):
         if key == "times":
@@ -50,6 +53,7 @@ class EventLine(object):
         elif key == "curtime":
             return self.__current_time
 
+    # output should be generated over adressing an index in the list
     def __getitem__(self,key):
         if len(self.__eventdata) > key:
             return key, self.__eventtime[key], self.__eventdata[key]
@@ -117,14 +121,15 @@ def main():
     parser.add_argument("-n","--initialpopulationsize",type=int,default=5)
     parser.add_argument("-N","--maxSize",type=int,default=100)
     parser.add_argument("-v","--verbose",default=False,action="store_true")
-    parser.add_argument("-o","--outputfile",default="test.png")
+    parser.add_argument("-o","--outputfile",default=None)
     args = parser.parse_args()
     
     pop = Population(**vars(args))
     for i in range(args.maxSize):
         pop.growth()
     
-    pop.plotGraph(args.outputfile)
+    if not args.outputfile is None:
+        pop.plotGraph(args.outputfile)
     
 if __name__ == "__main__":
     
