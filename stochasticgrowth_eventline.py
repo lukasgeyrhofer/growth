@@ -92,20 +92,21 @@ class Population(object):
         curID, curtime, curdata = self.events.nextevent()
         growthtime              = self.divtimes.DrawDivisionTime()
         
-        if self.__verbose:
-            print("# population growth (N = {:4d}) at time {:.4f}, (parentID {:4d}, cellID {:4d}, divisiontimes {:.6f} {:.6f})".format(self.__populationsize,curtime,curdata['parentID'],curID,growthtime[0],growthtime[1]))
-        print("{:.6f} {:4d}".format(curtime,self.__populationsize))
         
-        newtime,newID,newdata = self.events.addevent(time = curtime + growthtime[0], parentID = curID)
+        newID,newtime,newdata = self.events.addevent(time = curtime + growthtime[0], parentID = curID)
         self.graph.add_nodes_from([newID])
         self.graph.add_edge(newID,curID,length = growthtime[0])
         
-        newtime,newID,newdata = self.events.addevent(time = curtime + growthtime[1], parentID = curID)
+        newID,newtime,newdata = self.events.addevent(time = curtime + growthtime[1], parentID = curID)
         self.graph.add_nodes_from([newID])
         self.graph.add_edge(newID,curID,length = growthtime[1])
 
         self.__populationsize += 1
         
+        print("{:.6f} {:4d}".format(curtime,self.__populationsize))
+        if self.__verbose:
+            print("# population growth (N = {:4d}) at time {:.4f}, ({})-->({})-->({})&({}), with new division times ({:f}, {:f})".format(self.__populationsize,curtime,curdata['parentID'],curID,newID-1,newID,growthtime[0],growthtime[1]))
+
     
     def plotGraph(self,filename):
         layout = graphviz_layout(self.graph,prog='twopi')
