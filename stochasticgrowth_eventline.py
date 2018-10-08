@@ -89,10 +89,11 @@ class Population(object):
         
         
     def growth(self):
+        # go to the next event in the eventline, initialize random variables
         curID, curtime, curdata = self.events.nextevent()
         growthtime              = self.divtimes.DrawDivisionTime()
         
-        
+        # add two new daugther cells to the eventline when they will divide in the future
         newID,newtime,newdata = self.events.addevent(time = curtime + growthtime[0], parentID = curID)
         self.graph.add_nodes_from([newID])
         self.graph.add_edge(newID,curID,length = growthtime[0])
@@ -101,9 +102,9 @@ class Population(object):
         self.graph.add_nodes_from([newID])
         self.graph.add_edge(newID,curID,length = growthtime[1])
 
+        # store to keep track
         self.__populationsize += 1
         
-        print("{:.6f} {:4d}".format(curtime,self.__populationsize))
         if self.__verbose:
             print("# population growth (N = {:4d}) at time {:.4f}, ({})-->({})-->({})&({}), with new division times ({:f}, {:f})".format(self.__populationsize,curtime,curdata['parentID'],curID,newID-1,newID,growthtime[0],growthtime[1]))
 
@@ -113,9 +114,15 @@ class Population(object):
         nx.draw(self.graph,pos=layout,node_size = 0)
         plt.savefig(filename)
     
-    def timeline(self):
-        return np.array(self.__events._EventLine__eventtime)
     
+    # return internal variables
+    def __getattr__(self,key):
+        if key == "timeline":
+            return self.events.curtime, self.events.times
+
+    # output current state
+    def __str__(self):
+        return "{} {}".format(self.events.curtime,self.__populationsize)
     
 def main():
     parser = argparse.ArgumentParser()
@@ -128,6 +135,7 @@ def main():
     pop = Population(**vars(args))
     for i in range(args.maxSize):
         pop.growth()
+        print("{:s}".format(pop))
     
     if not args.outputfile is None:
         pop.plotGraph(args.outputfile)
