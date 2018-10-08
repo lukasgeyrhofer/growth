@@ -37,7 +37,7 @@ class EventLine(object):
 
     def nextevent(self):
         # find index of next event
-        timediff = np.array([t - self.__current_time if t > self.__current_time else self.__largest_time for t in self.__eventtime ])
+        timediff = np.array([t - self.__current_time if t > self.__current_time else self.__largest_time for t in self.__eventtime ]) # set all negative values of the calculation to the maximal time, self.__largest_time
         idx = timediff.argmin()
         
         # set the current status 
@@ -46,7 +46,7 @@ class EventLine(object):
         
         return self[idx]
     
-    
+    # return internal variables
     def __getattr__(self,key):
         if key == "times":
             return self.__eventtime
