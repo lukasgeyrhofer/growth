@@ -2,6 +2,7 @@
 
 import numpy as np
 import argparse
+import math,sys
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -88,6 +89,8 @@ class DivisionTimes_2dARP(object):
         
         self.recorded_DivTimes   = list()
 
+        self.__ignore_parents    = kwargs.get('ignoreParents',False) # debug mode
+        
         
     def ComputeStationaryCovariance(self):
         il1l1 = 1./(1-self.__lambda[0]**2)
@@ -106,6 +109,12 @@ class DivisionTimes_2dARP(object):
         # get division time for two offspring cells
         daugtherstates = list()
         divtime        = list()
+        
+        # debug more: no inheritance should lead to stationary distribution
+        if self.__ignore_parents:
+            if not parentstate is None:
+                self.recorded_DivTimes.append(self.TimeFromState(parentstate))                
+            parentstate = None
         
         
         if parentstate is None:
@@ -130,8 +139,10 @@ class DivisionTimes_2dARP(object):
 
 
     def __getattr__(self,key):
-        if key == 'divtimevariance':
+        if   key == 'divtimevariance':
             return np.dot(self.projection,np.dot(self.__stationaryCov,self.projection))
+        elif key == 'average':
+            return self.__meandivtime
 
 
 
@@ -206,18 +217,25 @@ class Population(object):
     
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n","--initialpopulationsize",type=int,default=5)
-    parser.add_argument("-N","--maxSize",type=int,default=100)
-    parser.add_argument("-v","--verbose",default=False,action="store_true")
-    parser.add_argument("-o","--outputfile",default=None)
-    parser.add_argument("-d","--divtimefile",default=None,type=str)
-    parser.add_argument("-G","--graphoutput",default=False,action="store_true")
+    parser_IO = parser.add_argument_group(description = "==== I/O parameters ====")
+    parser_IO.add_argument("-d","--divtimefile",   default = None,  type = str)
+    parser_IO.add_argument("-o","--outputfile",    default = None,  type = str)
+    parser_IO.add_argument("-G","--graphoutput",   default = False, action = "store_true")
+    parser_IO.add_argument("-I","--ignoreParents", default = False, action = "store_true")
+    parser_IO.add_argument("-v","--verbose",       default = False, action = "store_true")
+    
+    parser_alg = parser.add_argument_group(description = "==== algorithm parameters ===="
+    parser_alg.add_argument("-n", "--initialpopulationsize", type = int, default = 5)
+    parser_alg.add_argument("-N", "--maxSize",               type = int, default = 100)
     args = parser.parse_args()
 
     if args.outputfile is None: out = sys.stdout
     else:                       out = open(args.outputfile,'w')
     
+    
     pop = Population(**vars(args))
+    
+    out.write('# stationary values: {} {}\n'.format(pop.divtimes.average, pop.divtimes.divtimevariance))
     while pop.size < args.maxSize:
         pop.growth()
         out.write("{:s}\n".format(str(pop)))
