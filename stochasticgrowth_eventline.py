@@ -213,14 +213,16 @@ def main():
     parser.add_argument("-d","--divtimefile",default=None,type=str)
     parser.add_argument("-G","--graphoutput",default=False,action="store_true")
     args = parser.parse_args()
+
+    if args.outputfile is None: out = sys.stdout
+    else:                       out = open(args.outputfile,'w')
     
     pop = Population(**vars(args))
     while pop.size < args.maxSize:
         pop.growth()
-        print("{:s}".format(str(pop)))
+        out.write("{:s}\n".format(str(pop)))
     
-    if not args.outputfile is None:
-        pop.plotGraph(args.outputfile)
+    out.close()
     
     if not args.divtimefile is None:
         pop.divtimes.WriteDivTimes(args.divtimefile)
