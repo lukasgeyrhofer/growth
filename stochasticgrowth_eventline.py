@@ -74,20 +74,20 @@ class DivisionTimes_flat(object):
     
 class DivisionTimes_2dARP(object):
     def __init__(self,**kwargs):
-        self.__mindivtime     = kwargs.get('mindivtime',.1)
-        self.__meandivtime    = kwargs.get('meandivtime',1)
-        self.__lambda         = np.array(kwargs.get('lambda',[.2,.7]),dtype=np.float)
-        self.__beta           = kwargs.get('beta',.3)
-        self.__alpha          = kwargs.get('alpha',.6)
-        self.__noiseamplidute = kwargs.get('noiseamplidute',.6)
-        self.__divtimevar     = kwargs.get('divtimevar',.2)
+        self.__mindivtime        = kwargs.get('mindivtime',.1)
+        self.__meandivtime       = kwargs.get('meandivtime',1)
+        self.__lambda            = np.array(kwargs.get('lambda',[.3,.9]),dtype=np.float)
+        self.__beta              = kwargs.get('beta',.3)
+        self.__alpha             = kwargs.get('alpha',.6)
+        self.__noiseamplidute    = kwargs.get('noiseamplidute',.6)
+        self.__divtime_deviation = kwargs.get('divtimedev',.2)
         
-        self.A                = np.array([[self.__lambda[1],0],[(self.__lambda[0] - self.__lambda[1])/np.tan(2*np.pi*self.__beta),self.__lambda[0]]],dtype=np.float)
-        self.projection       = self.__divtimevar * np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
+        self.A                   = np.array([[self.__lambda[1],0],[(self.__lambda[0] - self.__lambda[1])/np.tan(2*np.pi*self.__beta),self.__lambda[0]]],dtype=np.float)
+        self.projection          = self.__divtime_deviation * np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
+        self.__stationaryCov     = self.ComputeStationaryCovariance()
+        
+        self.recorded_DivTimes   = list()
 
-        self.__stationaryCov  = self.ComputeStationaryCovariance()
-        
-        self.recorded_DivTimes = list()
         
     def ComputeStationaryCovariance(self):
         il1l1 = 1./(1-self.__lambda[0]**2)
@@ -97,28 +97,30 @@ class DivisionTimes_2dARP(object):
         return self.__noiseamplidute**2 * np.array([[ il2l2,                  (il1l2 - il2l2) * itan],
                                                     [ (il1l2 - il2l2) * itan, il1l1 + (il1l1 - 2*il1l2 + il2l2)*itan*itan]], dtype = np.float)
 
+    def TimeFromState(self,state):
+        dt = np.max([self.__meandivtime + np.dot(self.projection,state),self.__mindivtime])
+        return dt
+
         
     def DrawDivisionTimes(self, parentstate = None, size = 2):
         # get division time for two offspring cells
-        
         daugtherstates = list()
+        divtime        = list()
+        
         
         if parentstate is None:
             for i in range(size):
                 daugtherstates.append(np.random.multivariate_normal(mean = np.zeros(2), cov = self.__stationaryCov))
         else:
+            self.recorded_DivTimes.append(self.TimeFromState(parentstate))
             for i in range(size):
                 daugtherstates.append(np.dot(self.A,parentstate) + self.__noiseamplidute * np.random.normal(size = 2))
-        print(daugtherstates)
-        divtime = list()
+
         for state in daugtherstates:
-            divtime.append(self.__meandivtime + np.dot(self.projection,state))
-            if divtime[-1] < self.__mindivtime:
-                divtime[-1] = self.__mindivtime
-            self.recorded_DivTimes.append(divtime[-1])
+            divtime.append(self.TimeFromState(state))
         
         return divtime,daugtherstates
-    
+
     
     def WriteDivTimes(self,filename = 'divtimes.txt'):
         fp = open(filename,'w')
@@ -126,7 +128,13 @@ class DivisionTimes_2dARP(object):
             fp.write('{:.6f}\n'.format(dt))
         fp.close()
 
-    
+
+    def __getattr__(self,key):
+        if key == 'divtimevariance':
+            return np.dot(self.projection,np.dot(self.__stationaryCov,self.projection))
+
+
+
 
 class Population(object):
     def __init__(self,**kwargs):
@@ -144,7 +152,7 @@ class Population(object):
             self.events.addevent(time = growthtimes[i], parentID = 0, parentstate = states[i])
             if self.graphoutput:
                 self.graph.add_nodes_from([i])
-        
+
         
     def growth(self):
         # go to the next event in the eventline, initialize random variables
