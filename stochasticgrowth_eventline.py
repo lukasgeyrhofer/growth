@@ -59,17 +59,64 @@ class EventLine(object):
             return key, self.__eventtime[key], self.__eventdata[key]
         else:
             raise KeyError
-    
-    
-class DivisionTimes(object):
+
+
+class DivisionTimes_flat(object):
     def __init__(self,**kwargs):
         self.__mindivtime = kwargs.get("mindivtime",1.)
         self.__avgdivtime = kwargs.get("avgdivtime",2.)
     
-    def DrawDivisionTime(self,size = 2):
+    def DrawDivisionTimes(self,size = 2):
         dt = np.random.normal(loc = self.__avgdivtime,size = size)
         dt[dt < self.__mindivtime] = self.__mindivtime
         return dt
+
+    
+class DivisionTimes_2dARP(object):
+    def __init__(self,**kwargs):
+        self.__mindivtime     = kwargs.get('mindivtime',.1)
+        self.__meandivtime    = kwargs.get('meandivtime',1)
+        self.__lambda         = np.array(kwargs.get('lambda',[.3,.9]),dtype=np.float)
+        self.__beta           = kwargs.get('beta',.3)
+        self.__alpha          = kwargs.get('alpha',.6)
+        self.__noiseamplidute = kwargs.get('noiseamplidute',1.)
+        
+        self.A                = np.array([[self.__lambda[1],0],[(self.__lambda[0] - self.__lambda[1])/np.tan(2*np.pi*self.__beta),self.__lambda[0]]],dtype=np.float)
+        self.projection       = np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
+
+        self.__stationaryCov  = self.StationaryCovariance()
+        print(self.__stationaryCov)
+        
+        print(np.linalg.eig(self.__stationaryCov))
+        
+        
+    def StationaryCovariance(self):
+        il1l1 = 1./(1-self.__lambda[0]**2)
+        il2l2 = 1./(1-self.__lambda[1]**2)
+        il1l2 = 1./(1-self.__lambda[0]*self.__lambda[1])
+        itan  = 1./np.tan(2 * np.pi * self.__beta)
+        return self.__noiseamplidute**2 * np.array([[ il2l2,                  (il1l2 - il2l2) * itan],
+                                                    [ (il1l2 - il2l2) * itan, il1l1 + (il1l1 - 2*il1l2 + il2l2)*itan]], dtype = np.float)
+        
+    def DrawDivisionTimes(self, parentstate = None, size = 2):
+        # get division time for two offspring cells
+        
+        daugtherstates = list()
+        
+        if parentstate is None:
+            for i in range(size):
+                daugtherstates.append(np.random.multivariate_normal(mean = np.zeros(2), cov = self.__stationaryCov))
+        else:
+            for i in range(size):
+                daugtherstates.append(np.dot(self.A,parentstate) + self.__noiseamplidute * np.random.normal(size = 2))
+        
+        divtime = list()
+        for state in daugtherstates:
+            divtime.append(self.__meandivtime + np.dot(self.projection,state))
+            if divtime[-1] < self.__mindivtime:
+                divtime[-1] = self.__mindivtime
+        
+        return divtime,daugtherstates
     
 
 class Population(object):
@@ -78,29 +125,33 @@ class Population(object):
         self.__initialpopulationsize = kwargs.get("initialpopulationsize",5)
         self.__populationsize        = self.__initialpopulationsize
         self.events                  = EventLine(verbose = self.__verbose)
-        self.divtimes                = DivisionTimes()
+        self.divtimes                = DivisionTimes_2dARP()
+        self.graphoutput             = kwargs.get("graphoutput",True)
         
         self.graph                   = nx.Graph()
         
-        dt = self.divtimes.DrawDivisionTime(size = 5)
+        growthtimes,states = self.divtimes.DrawDivisionTimes(size = 5)
         for i in range(self.__initialpopulationsize):
-            self.events.addevent(time = dt[i], parentID = 0)
-            self.graph.add_nodes_from([i])
+            self.events.addevent(time = growthtimes[i], parentID = 0, parentstate = states[i])
+            if self.graphoutput:
+                self.graph.add_nodes_from([i])
         
         
     def growth(self):
         # go to the next event in the eventline, initialize random variables
         curID, curtime, curdata = self.events.nextevent()
-        growthtime              = self.divtimes.DrawDivisionTime()
+        growthtimes,states      = self.divtimes.DrawDivisionTimes(parentstate = curdata['parentstate'])
         
         # add two new daugther cells to the eventline when they will divide in the future
-        newID,newtime,newdata = self.events.addevent(time = curtime + growthtime[0], parentID = curID)
-        self.graph.add_nodes_from([newID])
-        self.graph.add_edge(newID,curID,length = growthtime[0])
+        newID,newtime,newdata = self.events.addevent(time = curtime + growthtimes[0], parentID = curID, parentstate = states[0])
+        if self.graphoutput:
+            self.graph.add_nodes_from([newID])
+            self.graph.add_edge(newID,curID,length = growthtimes[0])
         
-        newID,newtime,newdata = self.events.addevent(time = curtime + growthtime[1], parentID = curID)
-        self.graph.add_nodes_from([newID])
-        self.graph.add_edge(newID,curID,length = growthtime[1])
+        newID,newtime,newdata = self.events.addevent(time = curtime + growthtimes[1], parentID = curID, parentstate = states[1])
+        if self.graphoutput:
+            self.graph.add_nodes_from([newID])
+            self.graph.add_edge(newID,curID,length = growthtimes[1])
 
         # store to keep track
         self.__populationsize += 1
@@ -110,9 +161,12 @@ class Population(object):
 
     
     def plotGraph(self,filename):
-        layout = graphviz_layout(self.graph,prog='twopi')
-        nx.draw(self.graph,pos=layout,node_size = 0)
-        plt.savefig(filename)
+        if self.graphoutput:
+            layout = graphviz_layout(self.graph,prog='twopi')
+            nx.draw(self.graph,pos=layout,node_size = 0)
+            plt.savefig(filename)
+        else:
+            raise IOError('graph output not recorded during simulation')
     
     
     # return internal variables
@@ -122,7 +176,7 @@ class Population(object):
 
     # output current state
     def __str__(self):
-        return "{} {}".format(self.events.curtime,self.__populationsize)
+        return "{:.3f} {:4d}".format(self.events.curtime,self.__populationsize)
     
 def main():
     parser = argparse.ArgumentParser()
@@ -135,7 +189,7 @@ def main():
     pop = Population(**vars(args))
     for i in range(args.maxSize):
         pop.growth()
-        print("{:s}".format(pop))
+        print("{:s}".format(str(pop)))
     
     if not args.outputfile is None:
         pop.plotGraph(args.outputfile)
