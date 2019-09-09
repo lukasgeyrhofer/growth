@@ -224,7 +224,7 @@ def main():
     parser_IO.add_argument("-I","--ignoreParents", default = False, action = "store_true")
     parser_IO.add_argument("-v","--verbose",       default = False, action = "store_true")
     
-    parser_alg = parser.add_argument_group(description = "==== algorithm parameters ===="
+    parser_alg = parser.add_argument_group(description = "==== algorithm parameters ====")
     parser_alg.add_argument("-n", "--initialpopulationsize", type = int, default = 5)
     parser_alg.add_argument("-N", "--maxSize",               type = int, default = 100)
     args = parser.parse_args()
