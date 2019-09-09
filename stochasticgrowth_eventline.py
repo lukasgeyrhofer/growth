@@ -76,27 +76,27 @@ class DivisionTimes_2dARP(object):
     def __init__(self,**kwargs):
         self.__mindivtime     = kwargs.get('mindivtime',.1)
         self.__meandivtime    = kwargs.get('meandivtime',1)
-        self.__lambda         = np.array(kwargs.get('lambda',[.3,.9]),dtype=np.float)
+        self.__lambda         = np.array(kwargs.get('lambda',[.2,.7]),dtype=np.float)
         self.__beta           = kwargs.get('beta',.3)
         self.__alpha          = kwargs.get('alpha',.6)
-        self.__noiseamplidute = kwargs.get('noiseamplidute',1.)
+        self.__noiseamplidute = kwargs.get('noiseamplidute',.6)
+        self.__divtimevar     = kwargs.get('divtimevar',.2)
         
         self.A                = np.array([[self.__lambda[1],0],[(self.__lambda[0] - self.__lambda[1])/np.tan(2*np.pi*self.__beta),self.__lambda[0]]],dtype=np.float)
-        self.projection       = np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
+        self.projection       = self.__divtimevar * np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
 
-        self.__stationaryCov  = self.StationaryCovariance()
-        print(self.__stationaryCov)
+        self.__stationaryCov  = self.ComputeStationaryCovariance()
         
-        print(np.linalg.eig(self.__stationaryCov))
+        self.recorded_DivTimes = list()
         
-        
-    def StationaryCovariance(self):
+    def ComputeStationaryCovariance(self):
         il1l1 = 1./(1-self.__lambda[0]**2)
         il2l2 = 1./(1-self.__lambda[1]**2)
         il1l2 = 1./(1-self.__lambda[0]*self.__lambda[1])
         itan  = 1./np.tan(2 * np.pi * self.__beta)
         return self.__noiseamplidute**2 * np.array([[ il2l2,                  (il1l2 - il2l2) * itan],
-                                                    [ (il1l2 - il2l2) * itan, il1l1 + (il1l1 - 2*il1l2 + il2l2)*itan]], dtype = np.float)
+                                                    [ (il1l2 - il2l2) * itan, il1l1 + (il1l1 - 2*il1l2 + il2l2)*itan*itan]], dtype = np.float)
+
         
     def DrawDivisionTimes(self, parentstate = None, size = 2):
         # get division time for two offspring cells
@@ -109,14 +109,23 @@ class DivisionTimes_2dARP(object):
         else:
             for i in range(size):
                 daugtherstates.append(np.dot(self.A,parentstate) + self.__noiseamplidute * np.random.normal(size = 2))
-        
+        print(daugtherstates)
         divtime = list()
         for state in daugtherstates:
             divtime.append(self.__meandivtime + np.dot(self.projection,state))
             if divtime[-1] < self.__mindivtime:
                 divtime[-1] = self.__mindivtime
+            self.recorded_DivTimes.append(divtime[-1])
         
         return divtime,daugtherstates
+    
+    
+    def WriteDivTimes(self,filename = 'divtimes.txt'):
+        fp = open(filename,'w')
+        for dt in self.recorded_DivTimes:
+            fp.write('{:.6f}\n'.format(dt))
+        fp.close()
+
     
 
 class Population(object):
@@ -125,8 +134,8 @@ class Population(object):
         self.__initialpopulationsize = kwargs.get("initialpopulationsize",5)
         self.__populationsize        = self.__initialpopulationsize
         self.events                  = EventLine(verbose = self.__verbose)
-        self.divtimes                = DivisionTimes_2dARP()
-        self.graphoutput             = kwargs.get("graphoutput",True)
+        self.divtimes                = DivisionTimes_2dARP(**kwargs)
+        self.graphoutput             = kwargs.get("graphoutput",False)
         
         self.graph                   = nx.Graph()
         
@@ -174,9 +183,18 @@ class Population(object):
         if key == "timeline":
             return self.events.curtime, self.events.times
 
+
     # output current state
     def __str__(self):
-        return "{:.3f} {:4d}".format(self.events.curtime,self.__populationsize)
+        return "{:.6f} {:4d}".format(self.events.curtime,self.__populationsize)
+    
+    def __int__(self):
+        return self.__populationsize
+    
+    def __getattr__(self,key):
+        if key == 'size':
+            return int(self)
+    
     
 def main():
     parser = argparse.ArgumentParser()
@@ -184,15 +202,20 @@ def main():
     parser.add_argument("-N","--maxSize",type=int,default=100)
     parser.add_argument("-v","--verbose",default=False,action="store_true")
     parser.add_argument("-o","--outputfile",default=None)
+    parser.add_argument("-d","--divtimefile",default=None,type=str)
+    parser.add_argument("-G","--graphoutput",default=False,action="store_true")
     args = parser.parse_args()
     
     pop = Population(**vars(args))
-    for i in range(args.maxSize):
+    while pop.size < args.maxSize:
         pop.growth()
         print("{:s}".format(str(pop)))
     
     if not args.outputfile is None:
         pop.plotGraph(args.outputfile)
+    
+    if not args.divtimefile is None:
+        pop.divtimes.WriteDivTimes(args.divtimefile)
     
 if __name__ == "__main__":
     
