@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 import pygraphviz
 from networkx.drawing.nx_agraph import graphviz_layout
 
+
+
+
 class EventLine(object):
     def __init__(self,**kwargs):
         # storing data and times in different lists
@@ -62,15 +65,25 @@ class EventLine(object):
             raise KeyError
 
 
+
+
 class DivisionTimes_flat(object):
     def __init__(self,**kwargs):
         self.__mindivtime = kwargs.get("mindivtime",1.)
         self.__avgdivtime = kwargs.get("avgdivtime",2.)
+        self.__vardivtime = kwargs.get("vardivtime",1.)
+        self.__stddev_divtime = np.sqrt(self.__vardivtime)
     
-    def DrawDivisionTimes(self,size = 2):
-        dt = np.random.normal(loc = self.__avgdivtime,size = size)
+    def DrawDivisionTimes(self,size = 2, **kwargs):
+        dt = np.random.normal(loc = self.__avgdivtime,scale = self.__stddev_divtime,size = size)
         dt[dt < self.__mindivtime] = self.__mindivtime
         return dt
+
+    def __getattr__(self,key):
+        if   key == 'mean':
+            return self.__avgdivtime
+        elif key == 'variance':
+            return self.__vardivtime
 
     
 class DivisionTimes_2dARP(object):
@@ -131,7 +144,7 @@ class DivisionTimes_2dARP(object):
         return divtime,daugtherstates
 
     
-    def WriteDivTimes(self,filename = 'divtimes.txt'):
+    def WriteDivTimesToFile(self,filename = 'divtimes.txt'):
         fp = open(filename,'w')
         for dt in self.recorded_DivTimes:
             fp.write('{:.6f}\n'.format(dt))
@@ -139,9 +152,9 @@ class DivisionTimes_2dARP(object):
 
 
     def __getattr__(self,key):
-        if   key == 'divtimevariance':
+        if   key == 'variance':
             return np.dot(self.projection,np.dot(self.__stationaryCov,self.projection))
-        elif key == 'average':
+        elif key == 'mean':
             return self.__meandivtime
 
 
@@ -214,7 +227,39 @@ class Population(object):
         if key == 'size':
             return int(self)
     
+
     
+
+def MakeDictFromParameterList(params):
+
+    def AddEntry(d,key,val):
+        tmp = dict()
+        if not key is None:
+            if len(val) == 1:
+                tmp[key] = val[0]
+            elif len(val) > 1:
+                tmp[key] = np.array(val)
+        tmp.update(d)
+        return tmp
+
+    p = dict()
+    curkey = None
+    curvalue = list()
+    for entry in params:
+        try:
+            v = float(entry)
+            curvalue.append(v)
+        except:
+            p = AddEntry(p,curkey,curvalue)
+            curvalue = list()
+            curkey = entry
+
+    p = AddEntry(p,curkey,curvalue)
+    return p
+
+    
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser_IO = parser.add_argument_group(description = "==== I/O parameters ====")
@@ -227,25 +272,38 @@ def main():
     parser_alg = parser.add_argument_group(description = "==== algorithm parameters ====")
     parser_alg.add_argument("-n", "--initialpopulationsize", type = int, default = 5)
     parser_alg.add_argument("-N", "--maxSize",               type = int, default = 100)
+    parser_alg.add_argument("-P", "--parameters",            nargs = "*", default = None)
     args = parser.parse_args()
 
     if args.outputfile is None: out = sys.stdout
     else:                       out = open(args.outputfile,'w')
     
     
-    pop = Population(**vars(args))
+    argument_dict = vars(args)
+    if not args.parameters is None:
+        # add all entries in 'args.parameters' to the argument list itself, then delete its entry from the original dict
+        # all parameters for division times can now be processed
+        argument_dict.update(MakeDictFromParameterList(args.parameters))
+        argument_dict.pop('parameters')
     
-    out.write('# stationary values: {} {}\n'.format(pop.divtimes.average, pop.divtimes.divtimevariance))
+    # generate population object
+    pop = Population(**argument_dict)
+    
+    # write standard parameters of divition time distribution
+    if args.verbose:    out.write('# stationary values: {} {}\n'.format(pop.divtimes.mean, pop.divtimes.variance))
+    
+    # growth
     while pop.size < args.maxSize:
         pop.growth()
         out.write("{:s}\n".format(str(pop)))
     
+    # output
     out.close()
-    
     if not args.divtimefile is None:
-        pop.divtimes.WriteDivTimes(args.divtimefile)
-    
+        pop.divtimes.WriteDivTimesToFile(args.divtimefile)
+
+
+
 if __name__ == "__main__":
-    
     main()
     
