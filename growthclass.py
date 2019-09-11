@@ -41,7 +41,7 @@ class GrowthData():
         return filename.replace('popdyn','divtime')
     
     
-    def getDataInitialSize(self,popsize):
+    def getDataInitialSize(self,popsize = 10):
         for key in self.__data.keys():
             p = self.ParametersFromFilename(key)
             if p[0] == popsize:
