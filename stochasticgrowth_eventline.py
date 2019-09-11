@@ -171,7 +171,7 @@ class Population(object):
         
         self.graph                   = nx.Graph()
         
-        growthtimes,states = self.divtimes.DrawDivisionTimes(size = 5)
+        growthtimes,states = self.divtimes.DrawDivisionTimes(size = self.__initialpopulationsize)
         for i in range(self.__initialpopulationsize):
             self.events.addevent(time = growthtimes[i], parentID = 0, parentstate = states[i])
             if self.graphoutput:
