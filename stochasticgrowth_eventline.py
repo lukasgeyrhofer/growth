@@ -178,7 +178,7 @@ class Population(object):
                 self.graph.add_nodes_from([i])
 
         
-    def growth(self):
+    def division(self):
         # go to the next event in the eventline, initialize random variables
         curID, curtime, curdata = self.events.nextevent()
         growthtimes,states      = self.divtimes.DrawDivisionTimes(parentstate = curdata['parentstate'])
@@ -199,6 +199,11 @@ class Population(object):
         
         if self.__verbose:
             print("# population growth (N = {:4d}) at time {:.4f}, ({})-->({})-->({})&({}), with new division times ({:f}, {:f})".format(self.__populationsize,curtime,curdata['parentID'],curID,newID-1,newID,growthtime[0],growthtime[1]))
+
+
+    def growth(self,divisionevents = 1):
+        for i in range(divisionevents):
+            self.division()
 
     
     def plotGraph(self,filename):
