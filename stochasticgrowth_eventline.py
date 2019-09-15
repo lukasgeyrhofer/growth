@@ -90,13 +90,13 @@ class DivisionTimes_2dARP(object):
     def __init__(self,**kwargs):
         self.__mindivtime        = kwargs.get('mindivtime',.1)
         self.__meandivtime       = kwargs.get('meandivtime',1)
-        self.__lambda            = np.array(kwargs.get('lambda',[.3,.9]),dtype=np.float)
+        self.__eigenvalues       = np.array(kwargs.get('eigenvalues',[.3,.9]),dtype=np.float)
         self.__beta              = kwargs.get('beta',.3)
         self.__alpha             = kwargs.get('alpha',.6)
         self.__noiseamplidute    = kwargs.get('noiseamplidute',.6)
         self.__divtime_deviation = kwargs.get('divtimedev',.2)
         
-        self.A                   = np.array([[self.__lambda[1],0],[(self.__lambda[0] - self.__lambda[1])/np.tan(2*np.pi*self.__beta),self.__lambda[0]]],dtype=np.float)
+        self.A                   = np.array([[self.__eigenvalues[1],0],[(self.__eigenvalues[0] - self.__eigenvalues[1])/np.tan(2*np.pi*self.__beta),self.__eigenvalues[0]]],dtype=np.float)
         self.projection          = self.__divtime_deviation * np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
         self.__stationaryCov     = self.ComputeStationaryCovariance()
         
@@ -106,9 +106,9 @@ class DivisionTimes_2dARP(object):
         
         
     def ComputeStationaryCovariance(self):
-        il1l1 = 1./(1-self.__lambda[0]**2)
-        il2l2 = 1./(1-self.__lambda[1]**2)
-        il1l2 = 1./(1-self.__lambda[0]*self.__lambda[1])
+        il1l1 = 1./(1-self.__eigenvalues[0]**2)
+        il2l2 = 1./(1-self.__eigenvalues[1]**2)
+        il1l2 = 1./(1-self.__eigenvalues[0]*self.__eigenvalues[1])
         itan  = 1./np.tan(2 * np.pi * self.__beta)
         return self.__noiseamplidute**2 * np.array([[ il2l2,                  (il1l2 - il2l2) * itan],
                                                     [ (il1l2 - il2l2) * itan, il1l1 + (il1l1 - 2*il1l2 + il2l2)*itan*itan]], dtype = np.float)
