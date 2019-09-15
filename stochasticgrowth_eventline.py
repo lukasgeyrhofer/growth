@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+import pandas as pd
 import argparse
 import math,sys
 
@@ -29,7 +30,8 @@ class EventLine(object):
     def reset(self):
         self.__init__(**self.__store_for_reset)
 
-    def addevent(self,time,**kwargs):
+
+    def AddEvent(self,time,**kwargs):
         eventID = len(self.__eventtime)
         self.__eventtime.append(time)
         self.__eventdata.append(kwargs)
@@ -39,7 +41,8 @@ class EventLine(object):
 
         return self[eventID]
 
-    def nextevent(self):
+
+    def NextEvent(self):
         # find index of next event
         timediff = np.array([t - self.__current_time if t > self.__current_time else self.__largest_time for t in self.__eventtime ]) # set all negative values of the calculation to the maximal time, self.__largest_time
         idx = timediff.argmin()
@@ -49,13 +52,28 @@ class EventLine(object):
         self.__current_eventID = idx
         
         return self[idx]
+
+    
+    def EventTimes(self,first = None, uptocurrent = False):
+        d = np.sort(self.times)
+
+        if uptocurrent:
+            d = d[d<self.curtime]
+
+        if not first is None:
+            if len(d) < first:
+                d = d[:first]
+
+        return d
+    
     
     # return internal variables
     def __getattr__(self,key):
-        if key == "times":
-            return self.__eventtime
+        if  key == "times":
+            return np.sort(np.array(self.__eventtime))
         elif key == "curtime":
             return self.__current_time
+
 
     # output should be generated over adressing an index in the list
     def __getitem__(self,key):
@@ -88,21 +106,25 @@ class DivisionTimes_flat(object):
     
 class DivisionTimes_2dARP(object):
     def __init__(self,**kwargs):
-        self.__mindivtime        = kwargs.get('mindivtime',.1)
-        self.__meandivtime       = kwargs.get('meandivtime',1)
-        self.__eigenvalues       = np.array(kwargs.get('eigenvalues',[.3,.9]),dtype=np.float)
-        self.__beta              = kwargs.get('beta',.3)
-        self.__alpha             = kwargs.get('alpha',.6)
-        self.__noiseamplidute    = kwargs.get('noiseamplidute',.6)
-        self.__divtime_deviation = kwargs.get('divtimedev',.2)
+        # distribution of division times
+        self.__divtime_min     = kwargs.get('divtime_min',.1)
+        self.__divtime_mean    = kwargs.get('divtime_mean',1)
+        self.__divtime_var     = kwargs.get('divtime_var',.01)
+        self.recorded_DivTimes = list()
         
-        self.A                   = np.array([[self.__eigenvalues[1],0],[(self.__eigenvalues[0] - self.__eigenvalues[1])/np.tan(2*np.pi*self.__beta),self.__eigenvalues[0]]],dtype=np.float)
-        self.projection          = self.__divtime_deviation * np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
-        self.__stationaryCov     = self.ComputeStationaryCovariance()
+        # dynamics of internal state
+        self.__eigenvalues     = np.array(kwargs.get('eigenvalues',[.3,.9]),dtype=np.float)
+        self.__beta            = kwargs.get('beta',.3)
+        self.__alpha           = kwargs.get('alpha',.6)
+        self.__noiseamplidute  = kwargs.get('noiseamplidute',.6)
         
-        self.recorded_DivTimes   = list()
-
-        self.__ignore_parents    = kwargs.get('ignoreParents',False) # debug mode
+        self.A                 = np.array([[self.__eigenvalues[1],0],[(self.__eigenvalues[0] - self.__eigenvalues[1])/np.tan(2*np.pi*self.__beta),self.__eigenvalues[0]]],dtype=np.float)
+        self.__stationaryCov   = self.ComputeStationaryCovariance()
+        self.projection        = np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
+        self.projection       *= np.sqrt(self.__divtime_var/self.variance)
+        
+        # debug mode
+        self.__ignore_parents = kwargs.get('ignoreParents',False)
         
         
     def ComputeStationaryCovariance(self):
@@ -114,7 +136,7 @@ class DivisionTimes_2dARP(object):
                                                     [ (il1l2 - il2l2) * itan, il1l1 + (il1l1 - 2*il1l2 + il2l2)*itan*itan]], dtype = np.float)
 
     def TimeFromState(self,state):
-        dt = np.max([self.__meandivtime + np.dot(self.projection,state),self.__mindivtime])
+        dt = np.max([self.__divtime_mean + np.dot(self.projection,state),self.__divtime_min])
         return dt
 
         
@@ -153,9 +175,11 @@ class DivisionTimes_2dARP(object):
 
     def __getattr__(self,key):
         if   key == 'variance':
-            return np.dot(self.projection,np.dot(self.__stationaryCov,self.projection))
+            return np.dot(self.projection, np.dot(self.__stationaryCov, self.projection))
         elif key == 'mean':
-            return self.__meandivtime
+            return self.__divtime_mean
+        elif key == 'divisiontimes':
+            return np.array(self.recorded_DivTimes, dtype = np.float)
 
 
 
@@ -173,23 +197,23 @@ class Population(object):
         
         growthtimes,states = self.divtimes.DrawDivisionTimes(size = self.__initialpopulationsize)
         for i in range(self.__initialpopulationsize):
-            self.events.addevent(time = growthtimes[i], parentID = 0, parentstate = states[i])
+            self.events.AddEvent(time = growthtimes[i], parentID = 0, parentstate = states[i])
             if self.graphoutput:
                 self.graph.add_nodes_from([i])
 
         
     def division(self):
         # go to the next event in the eventline, initialize random variables
-        curID, curtime, curdata = self.events.nextevent()
+        curID, curtime, curdata = self.events.NextEvent()
         growthtimes,states      = self.divtimes.DrawDivisionTimes(parentstate = curdata['parentstate'])
         
         # add two new daugther cells to the eventline when they will divide in the future
-        newID,newtime,newdata = self.events.addevent(time = curtime + growthtimes[0], parentID = curID, parentstate = states[0])
+        newID,newtime,newdata = self.events.AddEvent(time = curtime + growthtimes[0], parentID = curID, parentstate = states[0])
         if self.graphoutput:
             self.graph.add_nodes_from([newID])
             self.graph.add_edge(newID,curID,length = growthtimes[0])
         
-        newID,newtime,newdata = self.events.addevent(time = curtime + growthtimes[1], parentID = curID, parentstate = states[1])
+        newID,newtime,newdata = self.events.AddEvent(time = curtime + growthtimes[1], parentID = curID, parentstate = states[1])
         if self.graphoutput:
             self.graph.add_nodes_from([newID])
             self.graph.add_edge(newID,curID,length = growthtimes[1])
@@ -201,9 +225,24 @@ class Population(object):
             print("# population growth (N = {:4d}) at time {:.4f}, ({})-->({})-->({})&({}), with new division times ({:f}, {:f})".format(self.__populationsize,curtime,curdata['parentID'],curID,newID-1,newID,growthtime[0],growthtime[1]))
 
 
-    def growth(self,divisionevents = 1):
-        for i in range(divisionevents):
+    def growth(self,divisionevents = None, maxpopsize = None, maxtime = None, time = None):
+        if divisionevents is None and maxpopsize is None and maxtime is None and time is None:
             self.division()
+        elif not divisionevents is None:
+            for i in range(divisionevents):
+                self.division()
+        elif not maxpopsize is None:
+            while int(self) <= maxpopsize:
+                self.division()
+        elif not maxtime is None:
+            while self.events.curtime <= maxtime:
+                self.division()
+        elif not time is None:
+            maxtime = self.events.curtime + time
+            while self.events.curtime <= maxtime:
+                self.division()
+        else:
+            raise NotImplementedError
 
     
     def plotGraph(self,filename):
@@ -229,8 +268,18 @@ class Population(object):
         return self.__populationsize
     
     def __getattr__(self,key):
-        if key == 'size':
+        if   key == 'size':
             return int(self)
+        elif key == 'divisiontimes':
+            return self.divtimes.divisiontimes
+        elif key == 'founderdivisiontimes':
+            return self.divtimes.divisiontimes[:self.__initialpopulationsize]
+        elif key == 'divisiondata':
+            d = self.divisiontimes
+            t = self.events.times[:len(d)]
+            s = np.arange(len(d))
+            return pd.DataFrame({'times':t, 'divisiontimes': d, 'populationsize': s})
+            
     
 
     
