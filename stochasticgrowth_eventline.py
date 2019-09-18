@@ -116,7 +116,7 @@ class DivisionTimes_2dARP(object):
         self.__eigenvalues     = np.array(kwargs.get('eigenvalues',[.3,.9]),dtype=np.float)
         self.__beta            = kwargs.get('beta',.3)
         self.__alpha           = kwargs.get('alpha',.6)
-        self.__noiseamplidute  = kwargs.get('noiseamplidute',.6)
+        self.__noiseamplitude  = kwargs.get('noiseamplitude',.6)
         
         self.A                 = np.array([[self.__eigenvalues[1],0],[(self.__eigenvalues[0] - self.__eigenvalues[1])/np.tan(2*np.pi*self.__beta),self.__eigenvalues[0]]],dtype=np.float)
         self.__stationaryCov   = self.ComputeStationaryCovariance()
@@ -132,7 +132,7 @@ class DivisionTimes_2dARP(object):
         il2l2 = 1./(1-self.__eigenvalues[1]**2)
         il1l2 = 1./(1-self.__eigenvalues[0]*self.__eigenvalues[1])
         itan  = 1./np.tan(2 * np.pi * self.__beta)
-        return self.__noiseamplidute**2 * np.array([[ il2l2,                  (il1l2 - il2l2) * itan],
+        return self.__noiseamplitude**2 * np.array([[ il2l2,                  (il1l2 - il2l2) * itan],
                                                     [ (il1l2 - il2l2) * itan, il1l1 + (il1l1 - 2*il1l2 + il2l2)*itan*itan]], dtype = np.float)
 
     def TimeFromState(self,state):
@@ -158,7 +158,7 @@ class DivisionTimes_2dARP(object):
         else:
             self.recorded_DivTimes.append(self.TimeFromState(parentstate))
             for i in range(size):
-                daugtherstates.append(np.dot(self.A,parentstate) + self.__noiseamplidute * np.random.normal(size = 2))
+                daugtherstates.append(np.dot(self.A,parentstate) + self.__noiseamplitude * np.random.normal(size = 2))
 
         for state in daugtherstates:
             divtime.append(self.TimeFromState(state))
