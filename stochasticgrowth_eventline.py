@@ -12,6 +12,213 @@ import pygraphviz
 from networkx.drawing.nx_agraph import graphviz_layout
 
 
+class EventNode(object):
+    def __init__(self,**kwargs):
+        # pointers in time
+        self.next_ref     = kwargs.get('next_ref', None)
+        self.last_ref     = kwargs.get('last_ref', None)
+        # pointers in tree
+        self.parent_ref   = kwargs.get('parent_ref', None)
+        self.daugther_ref = kwargs.get('daugther_ref', [None, None])
+        # actual relevant data
+        self.ID           = kwargs.get('ID', None)
+        self.time         = kwargs.get('time', 0)
+        self.data         = kwargs.get('data', None)
+
+
+
+class NewEventLine(object):
+    def __init__(self,**kwargs):
+        self.__store_for_reset = kwargs
+        self.__verbose         = kwargs.get('verbose',False)
+        
+        self.__start_ref       = None
+        self.__end_ref         = None
+        self.__current_ref     = None
+        
+        self.__count_events    = 0
+        self.__nextID          = 0
+
+    
+    def Reset(self):
+        self.__init__(**self.__store_for_reset)
+
+        
+    def InsertEvent_Between(self, time, data, last_ref, next_ref):
+        n = EventNode(ID = self.__nextID,time = time, data = data, last_ref = last_ref, next_ref = next_ref)
+        last_ref.next_ref = n
+        next_ref.last_ref = n
+        return n
+
+    def InsertEvent_Start(self, time, data, next_ref):
+        n = EventNode(ID = self.__nextID, time = time, data = data, last_ref = None, next_ref = next_ref)
+        self.__start_ref = n
+        next_ref.last_ref = n
+        return n
+
+    def InsertEvent_End(self,time,data, last_ref):
+        n = EventNode(ID = self.__nextID, time = time, data = data, last_ref = last_ref, next_ref = None)
+        self.__end_ref = n
+        last_ref.next_ref = n
+        return n
+
+    def InsertEvent_First(self,time,data):
+        n = EventNode(ID = self.__nextID, time = time, data = data, last_ref = None, next_ref = None)
+        self.__end_ref = n
+        self.__start_ref = n
+        return n
+
+    def getTime(self,e):
+        if not e is None:
+            return e.time
+        else:
+            return 0
+
+
+
+    def AddEvent(self, time = None, **kwargs):
+        n = EventNode(time = time, data = kwargs)
+        
+        if self.__start_ref is None:
+            self.__start_ref = n
+        else:
+            e = self.__start_ref
+            if time < e.time:
+                n.next_ref = e
+                self.__start_ref = n
+            else:
+                while time < e.time:
+                    if not e.next_ref is None:
+                        if e.next_ref.time < time:
+                            n.next_ref = e.next_ref
+                            e.next_ref = n
+                            break
+                        else:
+                            e = e.next_ref
+                    else:
+                        e.next_ref = n
+                        break
+
+        return self.EventData(n)
+                
+
+
+    def AddEvent3(self, time = None, **kwargs):
+        n = None
+        if self.__start_ref is None:
+            n = EventNode(ID = self.__nextID,time = time, data = kwargs);
+        else:
+            e = self.__start_ref
+            if time < e.time:
+                n = EventNode(ID = self.__nextID, time = time, data = kwargs, next_ref = e)
+                self.__start_ref = n
+                e.last_ref = n
+            else:
+                while e.time < time:
+                    if e.next_ref is None:
+                        # reached end of linked list
+                        n = EventNode(ID = self.__nextID, time = time, data = kwargs, last_ref = e)
+                        self.__end_ref = n
+                        e.last_ref = n
+                        break
+                    else:
+                        # continue iterating
+                        e = e.next_ref
+                if n is None:
+                    n = EventNode(ID = self.__nextID, time = time, data = kwargs, next_ref = e.next_ref, last_ref = e)
+                    e.last_ref.next_ref = n
+                    e.last_ref = n
+
+
+        
+        print(self.times)
+        #print('{} {:.6f} {:.6f} {:.6f}'.format(it,self.getTime(n.last_ref),self.getTime(n),self.getTime(n.next_ref)))
+        #print('{} {} {}'.format(n.last_ref,n,n.next_ref))
+        return self.EventData(n)
+
+
+
+
+    def AddEvent2(self, time = None, start_insert_from = None, **kwargs):
+        insert_type = 0
+        if start_insert_from is None:
+            if self.__start_ref is None:
+                # generate first event
+                n = self.InsertEvent_First(time = time, data = kwargs); insert_type = 0
+            else:
+                e = self.__start_ref
+                if e.time > time:
+                    n = self.InsertEvent_Start(time = time, data = kwargs, next_ref = e); insert_type = 1
+                else:
+                    while e.time < time:
+                        if e.next_ref is None:  break
+                        else:                   e = e.next_ref
+                    if e.next_ref is None:
+                        n = self.InsertEvent_End(time = time, data = kwargs, last_ref = e); insert_type = 2
+                    else:
+                        n = self.InsertEvent_Between(time = time, data = kwargs, last_ref = e, next_ref = e.next_ref); insert_type = 3
+                
+        else:
+            # get direction
+            if time < start_insert_from.time:
+                e = start_insert_from.last_ref
+                while e.time > time:
+                    if not e.last_ref is None:  e = e.last_ref
+                    else:                       break
+                if e.last_ref is None:          n = self.InsertEvent_Start  (time = time, data = kwargs,                        next_ref = e); insert_type = 4
+                else:                           n = self.InsertEvent_Between(time = time, data = kwargs, last_ref = e.last_ref, next_ref = e); insert_type = 5
+            else:
+                e = start_insert_from.next_ref
+                while e.time < time:
+                    if not e.next_ref is None:  e = e.next_ref
+                    else:                       break
+                if e.next_ref is None:          n = self.InsertEvent_End    (time = time, data = kwargs, last_ref = e); insert_type = 6
+                else:                           n = self.InsertEvent_Between(time = time, data = kwargs, last_ref = e, next_ref = e.next_ref); insert_type = 7
+
+        self.__nextID += 1
+        
+        print('{} {:.6f} {:.6f} {:.6f}'.format(insert_type,self.getTime(n.last_ref),self.getTime(n),self.getTime(n.next_ref)))
+        return self.EventData(n)
+    
+    
+    
+    def NextEvent(self):
+        if self.__current_ref is None:
+            self.__current_ref = self.__start_ref
+            #elif not self.__current_ref.next_ref is None:
+        else:
+            self.__current_ref = self.__current_ref.next_ref
+        return self.EventData(self.__current_ref)
+
+
+    def EventData(self,e = None):
+        if not e is None:
+            return e.ID, e.time, e.data
+        else:
+            return None,None,None
+
+
+    def EventTimes(self,first = None):
+        return self.GenerateListOfTimes()
+    
+
+    def GenerateListOfTimes(self):
+        lot = list()
+        n = self.__start_ref
+        while not n is None:
+            lot.append(n.time)
+            n=n.next_ref
+        return np.array(lot,dtype=np.float)
+
+
+    def __getattr__(self,key):
+        if key  == 'times':
+            return self.GenerateListOfTimes()
+        elif key == 'curtime':
+            if not self.__current_ref is None:
+                return self.__current_ref.time
+            else:
+                return 0
 
 
 class EventLine(object):
@@ -25,6 +232,8 @@ class EventLine(object):
         self.__store_for_reset = kwargs
         self.__largest_time = 0.
         self.__verbose = kwargs.get("verbose",False)
+        
+        print('old event line')
 
     # delete everything and reset
     def reset(self):
@@ -189,7 +398,10 @@ class Population(object):
         self.__verbose               = kwargs.get("verbose",False)
         self.__initialpopulationsize = kwargs.get("initialpopulationsize",5)
         self.__populationsize        = self.__initialpopulationsize
-        self.events                  = EventLine(verbose = self.__verbose)
+        
+        if int(kwargs.get('EventLine',0)) == 0:  self.events = EventLine(verbose = self.__verbose)
+        else:                                    self.events = NewEventLine(verbose = self.__verbose)
+
         self.divtimes                = DivisionTimes_2dARP(**kwargs)
         self.graphoutput             = kwargs.get("graphoutput",False)
         
@@ -197,12 +409,13 @@ class Population(object):
         
         growthtimes,states = self.divtimes.DrawDivisionTimes(size = self.__initialpopulationsize)
         for i in range(self.__initialpopulationsize):
-            self.events.AddEvent(time = growthtimes[i], parentID = 0, parentstate = states[i])
+            self.events.AddEvent(time = growthtimes[i], parentID = -1, parentstate = states[i])
             if self.graphoutput:
                 self.graph.add_nodes_from([i])
 
         
     def division(self):
+        print(self.events.NextEvent())
         # go to the next event in the eventline, initialize random variables
         curID, curtime, curdata = self.events.NextEvent()
         growthtimes,states      = self.divtimes.DrawDivisionTimes(parentstate = curdata['parentstate'])
