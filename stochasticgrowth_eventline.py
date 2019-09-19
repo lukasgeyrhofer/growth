@@ -54,8 +54,13 @@ class EventLineLL(object):
 
     def AddEvent(self, time = None, **kwargs):
         updated = False
-        # create event ...
-        n = EventNode(ID = self.__nextID, time = time, data = kwargs)
+        # create event ... assume parent is the event that 'current_ref' points to
+        n = EventNode(ID = self.__nextID, time = time, data = kwargs, parent_ref = self.__current_ref)
+        
+        # set parent
+        if not self.__current_ref is None:
+            self.__current_ref.daughter_ref = n
+            
         # ... then sort it into the linked list
         if self.__start_ref is None:
             # first option is that nothing in the linked list exists sofar
