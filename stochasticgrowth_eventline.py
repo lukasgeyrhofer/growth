@@ -19,7 +19,7 @@ class EventNode(object):
         self.last_ref     = kwargs.get('last_ref', None)
         # pointers in tree
         self.parent_ref   = kwargs.get('parent_ref', None)
-        self.daugther_ref = kwargs.get('daugther_ref', [None, None])
+        self.daughter_ref = kwargs.get('daughter_ref', [None, None])
         # actual relevant data
         self.ID           = kwargs.get('ID', None)
         self.time         = kwargs.get('time', 0)
@@ -29,15 +29,17 @@ class EventNode(object):
 
 class EventLineLL(object):
     def __init__(self,**kwargs):
-        self.__store_for_reset = kwargs
-        self.__verbose         = kwargs.get('verbose',False)
+        self.__store_for_reset  = kwargs
+        self.__verbose          = kwargs.get('verbose',False)
         
-        self.__start_ref       = None
-        self.__end_ref         = None
-        self.__current_ref     = None
+        # various pointers to different events in the linked list
+        self.__start_ref        = None # start of linked list
+        self.__end_ref          = None # end of linked list
+        self.__current_ref      = None # current event
+        self.__last_added_event = None # last added event
         
-        self.__count_events    = 0
-        self.__nextID          = 0
+        # keep track of current ID, needed for data structures outside of this linked list
+        self.__nextID           = 0
 
     
     def Reset(self):
@@ -59,7 +61,10 @@ class EventLineLL(object):
         
         # set parent
         if not self.__current_ref is None:
-            self.__current_ref.daughter_ref = n
+            if self.__current_ref.daughter_ref[0] is None:
+                self.__current_ref.daughter_ref[0] = n
+            else:
+                self.__current_ref.daughter_ref[1] = n
             
         # ... then sort it into the linked list
         if self.__start_ref is None:
@@ -95,6 +100,7 @@ class EventLineLL(object):
                     e.last_ref.next_ref = n
                     e.last_ref = n
 
+        self.__nextID += 1
         return self.EventData(n)
 
 
@@ -128,6 +134,28 @@ class EventLineLL(object):
                 return self.__current_ref.time
             else:
                 return 0
+
+
+    def __getitem__(self,key):
+        # also backward compatibility, accessing a particular event via its ID is probably not the best idea
+        e = self.__start_ref
+        while e.ID != key:
+            if not e.next_ref is None: e = e.next_ref
+            else: break
+        if e.ID == key:
+            return self.EventData(e)
+        else:
+            return self.EventData(None)
+
+
+    def __str__(self):
+        max_time = None
+        if not self.__end_ref is None:
+            max_time = self.__end_ref.time
+        cur_time = None
+        if not self.__current_ref is None:
+            cur_time = self.__current_ref.time
+        return '# EventLine Linked Lists, collected {} events, maximum time: {}, current time: {}'.format(self.__nextID,max_time, cur_time)
 
 
 class EventLine(object):
@@ -307,8 +335,8 @@ class Population(object):
         self.__initialpopulationsize = kwargs.get("initialpopulationsize",5)
         self.__populationsize        = self.__initialpopulationsize
         
-        if int(kwargs.get('EventLine',0)) == 0:  self.events = EventLine(verbose = self.__verbose)
-        else:                                    self.events = EventLineLL(verbose = self.__verbose)
+        if int(kwargs.get('EventLine',1)) == 0:  self.events = EventLine(verbose = self.__verbose)
+        else:                                    self.events = EventLineLL(verbose = self.__verbose) # default behavior is linked list
 
         self.divtimes                = DivisionTimes_2dARP(**kwargs)
         self.graphoutput             = kwargs.get("graphoutput",False)
