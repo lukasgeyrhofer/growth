@@ -539,7 +539,7 @@ def main():
     # output
     out.close()
     if not args.divtimefile is None:
-        pop.divtimes.WriteDivTimesToFile(args.divtimefile)
+        pop.divisiondata.to_csv(args.divtimefile)
 
 
 
