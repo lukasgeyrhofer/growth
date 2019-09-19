@@ -29,17 +29,19 @@ class EventNode(object):
 
 class EventLineLL(object):
     def __init__(self,**kwargs):
-        self.__store_for_reset  = kwargs
-        self.__verbose          = kwargs.get('verbose',False)
+        self.__store_for_reset        = kwargs
+        self.__verbose                = kwargs.get('verbose',False)
         
         # various pointers to different events in the linked list
-        self.__start_ref        = None # start of linked list
-        self.__end_ref          = None # end of linked list
-        self.__current_ref      = None # current event
-        self.__last_added_event = None # last added event
+        self.__start_ref              = None # start of linked list
+        self.__end_ref                = None # end of linked list
+        self.__current_ref            = None # current event
         
         # keep track of current ID, needed for data structures outside of this linked list
-        self.__nextID           = 0
+        self.__nextID                 = 0
+        
+        self.__last_added_event       = None # last added event
+        self.__insert_from_last_event = kwargs.get('InsertFromLast',True)
 
     
     def Reset(self):
@@ -72,8 +74,8 @@ class EventLineLL(object):
             self.__start_ref = n
             self.__end_ref = n
             updated = True
-        else:
-            # otherwise, set pointer to first element and go through options
+        elif not self.__insert_from_last_event:
+            # set pointer to first element and go through options
             e = self.__start_ref
             if time < e.time:
                 # new time is smaller than the time of first element, thus add new event at beginning of linked list
@@ -99,8 +101,43 @@ class EventLineLL(object):
                     n.next_ref = e
                     e.last_ref.next_ref = n
                     e.last_ref = n
+        else:
+            e = self.__last_added_event
+            if e.time < time:
+                while e.time < time:
+                    if e.next_ref is None:
+                        e.next_ref = n
+                        n.last_ref = e
+                        self.__end_ref = n
+                        updated = True
+                        break
+                    else:
+                        e = e.next_ref
+                if not updated:
+                    n.last_ref = e.last_ref
+                    n.next_ref = e
+                    e.last_ref.next_ref = n
+                    e.last_ref = n
+            else:
+                while e.time > time:
+                    if e.last_ref is None:
+                        n.next_ref = e
+                        e.last_ref = n
+                        self.__start_ref = n
+                        updated = True
+                        break
+                    else:
+                        e = e.last_ref
+                if not updated:
+                    e.next_ref.last_ref = n
+                    n.next_ref = e.next_ref
+                    e.next_ref = n
+                    n.last_ref = e
+
+
 
         self.__nextID += 1
+        self.__last_added_event = n
         return self.EventData(n)
 
 
