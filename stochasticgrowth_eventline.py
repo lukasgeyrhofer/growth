@@ -285,6 +285,8 @@ class DivisionTimes_flat(object):
         elif key == 'variance':
             return self.__vardivtime
 
+
+
     
 class DivisionTimes_2dARP(object):
     def __init__(self,**kwargs):
@@ -363,6 +365,38 @@ class DivisionTimes_2dARP(object):
         elif key == 'divisiontimes':
             return np.array(self.recorded_DivTimes, dtype = np.float)
 
+
+
+class SampleFirstGeneration(object):
+    def __init__(self,**kwargs):
+        self.__initialpopulationsize = kwargs.get("initialpopulationsize",5)
+        self.divtimedistr = DivisionTimes_2dARP(**kwargs)
+        
+        self.__numpoints = kwargs.get("initial_numpoints",1000)
+        self.__distr_start = np.max(0
+        
+        self.__divtime_min     = kwargs.get('divtime_min',.1)
+        self.__divtime_mean    = kwargs.get('divtime_mean',1)
+        self.__divtime_var     = kwargs.get('divtime_var',.01)
+        
+        
+        tmin = np.max([0,self.__divtime_mean - 4 * np.sqrt(self.__divtime_var)])
+        tmax = self.__divtime_mean + 4 * np.sqrt(self.__divtime_var)
+        self.t = np.linspace(xmin,xmax,num = self.__numpoints)
+        
+        self.__divtimes = self.gauss(t)
+        self.__integrated_divtimes = np.array([np.sum(self.__divtimes[i:]) * (self.t[1] - self.t[0]) for i in range(self.__numpoints)])
+        self.__shifted_normalized_divtimes = np.zeros((self.__numpoints,self.__numpoints))
+        for i in range(self.__numpoints):
+            self.__shifted_normalized_divtimes[i,i:] = self.__divtimes[i:]/self.__integrated_divtimes[i]
+        
+        self.__remaining_time  = np.dot(self.__shifted_normalized_divtimes,self.__divtimes)
+        self.__remaining_time /= np.sum(self.__remaining_time) * (t[1] - t[0])
+        
+        
+    def gauss(self,x):
+        return np.exp(-0.5*(x - self.__divtime_mean)**2/self.__divtime_var)/np.sqrt(2*np.pi*self.__divtime_var)
+        
 
 
 
