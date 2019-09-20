@@ -367,35 +367,6 @@ class DivisionTimes_2dARP(object):
 
 
 
-class SampleFirstGeneration(object):
-    def __init__(self,**kwargs):
-        self.__initialpopulationsize = kwargs.get("initialpopulationsize",5)
-        self.divtimedistr = DivisionTimes_2dARP(**kwargs)
-        
-        self.__numpoints = kwargs.get("initial_numpoints",1000)
-        
-        self.__divtime_min     = kwargs.get('divtime_min',.1)
-        self.__divtime_mean    = kwargs.get('divtime_mean',1)
-        self.__divtime_var     = kwargs.get('divtime_var',.01)
-        
-        
-        tmin = np.max([0,self.__divtime_mean - 4 * np.sqrt(self.__divtime_var)])
-        tmax = self.__divtime_mean + 4 * np.sqrt(self.__divtime_var)
-        self.t = np.linspace(xmin,xmax,num = self.__numpoints)
-        
-        self.__divtimes = self.gauss(t)
-        self.__integrated_divtimes = np.array([np.sum(self.__divtimes[i:]) * (self.t[1] - self.t[0]) for i in range(self.__numpoints)])
-        self.__shifted_normalized_divtimes = np.zeros((self.__numpoints,self.__numpoints))
-        for i in range(self.__numpoints):
-            self.__shifted_normalized_divtimes[i,i:] = self.__divtimes[i:]/self.__integrated_divtimes[i]
-        
-        self.__remaining_time  = np.dot(self.__shifted_normalized_divtimes,self.__divtimes)
-        self.__remaining_time /= np.sum(self.__remaining_time) * (t[1] - t[0])
-        
-        
-    def gauss(self,x):
-        return np.exp(-0.5*(x - self.__divtime_mean)**2/self.__divtime_var)/np.sqrt(2*np.pi*self.__divtime_var)
-        
 
 
 
@@ -536,7 +507,6 @@ def MakeDictFromParameterList(params):
 def main():
     parser = argparse.ArgumentParser()
     parser_IO = parser.add_argument_group(description = "==== I/O parameters ====")
-    parser_IO.add_argument("-d","--divtimefile",   default = None,  type = str)
     parser_IO.add_argument("-o","--outputfile",    default = None,  type = str)
     parser_IO.add_argument("-G","--graphoutput",   default = False, action = "store_true")
     parser_IO.add_argument("-I","--ignoreParents", default = False, action = "store_true")
@@ -548,10 +518,6 @@ def main():
     parser_alg.add_argument("-P", "--parameters",            nargs = "*", default = None)
     args = parser.parse_args()
 
-    if args.outputfile is None: out = sys.stdout
-    else:                       out = open(args.outputfile,'w')
-    
-    
     argument_dict = vars(args)
     if not args.parameters is None:
         # add all entries in 'args.parameters' to the argument list itself, then delete its entry from the original dict
@@ -563,7 +529,7 @@ def main():
     pop = Population(**argument_dict)
     
     # write standard parameters of divition time distribution
-    if args.verbose:    out.write('# stationary values: {} {}\n'.format(pop.divtimes.mean, pop.divtimes.variance))
+    print('# stationary values: {} {}\n'.format(pop.divtimes.mean, pop.divtimes.variance))
     
     # growth
     while pop.size < args.maxSize:
@@ -573,7 +539,7 @@ def main():
     # output
     out.close()
     if not args.divtimefile is None:
-        pop.divisiondata.to_csv(args.divtimefile)
+        pop.divisiondata.to_csv(args.outputfile)
 
 
 
