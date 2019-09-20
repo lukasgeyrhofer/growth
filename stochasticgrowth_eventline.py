@@ -373,7 +373,6 @@ class SampleFirstGeneration(object):
         self.divtimedistr = DivisionTimes_2dARP(**kwargs)
         
         self.__numpoints = kwargs.get("initial_numpoints",1000)
-        self.__distr_start = np.max(0
         
         self.__divtime_min     = kwargs.get('divtime_min',.1)
         self.__divtime_mean    = kwargs.get('divtime_mean',1)
@@ -416,7 +415,8 @@ class Population(object):
         
         growthtimes,states = self.divtimes.DrawDivisionTimes(size = self.__initialpopulationsize)
         for i in range(self.__initialpopulationsize):
-            self.events.AddEvent(time = growthtimes[i], parentID = -1, parentstate = states[i])
+            remaining_growthtime = np.random.uniform(high = growthtimes[i])
+            self.events.AddEvent(time = remaining_growthtime, parentID = -1, parentstate = states[i])
             if self.graphoutput:
                 self.graph.add_nodes_from([i])
 
