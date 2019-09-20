@@ -162,6 +162,31 @@ class EventLineLL(object):
             n=n.next_ref
         return np.array(lot,dtype=np.float)
 
+    def GenerateListOfData(self):
+        df = None
+        n = self.__start_ref
+        df = pd.DataFrame(n.data)
+        while not n is None:
+            n=n.next_ref
+            df.append(n.data)
+        return df
+
+    def ExpandDict(self,d):
+        r = dict()
+        for key,value in d.items():
+            if not isinstance(value,(list,tuple,np.ndarray)):
+                r.update({key:[value]})
+            else:
+                for i,vi in enumerate(value):
+                    r.update({key + str(i):[vi]})
+        return r
+
+
+    def EventToDict(self,e):
+        curdata = {'ID':[e.ID],'time':[e.time]}
+        curdata.update(self.ExpandDict(e.data))
+        return curdata
+
 
     def __getattr__(self,key):
         if key  == 'times':
@@ -171,6 +196,14 @@ class EventLineLL(object):
                 return self.__current_ref.time
             else:
                 return 0
+        elif key == 'data':
+            n = self.__start_ref
+            if not n is None:
+                df = pd.DataFrame(self.EventToDict(n))
+                while n != self.__current_ref:
+                    n = n.next_ref
+                    df = df.append(pd.DataFrame(self.EventToDict(n)), ignore_index = True)
+            return df
 
 
     def __getitem__(self,key):
@@ -193,76 +226,6 @@ class EventLineLL(object):
         if not self.__current_ref is None:
             cur_time = self.__current_ref.time
         return '# EventLine Linked Lists, collected {} events, maximum time: {}, current time: {}'.format(self.__nextID,max_time, cur_time)
-
-
-class EventLine(object):
-    def __init__(self,**kwargs):
-        # storing data and times in different lists
-        self.__eventtime = list()
-        self.__eventdata = list()
-
-        self.__current_time = 0.
-        self.__current_eventID = 0
-        self.__store_for_reset = kwargs
-        self.__largest_time = 0.
-        self.__verbose = kwargs.get("verbose",False)
-        
-
-    # delete everything and reset
-    def reset(self):
-        self.__init__(**self.__store_for_reset)
-
-
-    def AddEvent(self,time,**kwargs):
-        eventID = len(self.__eventtime)
-        self.__eventtime.append(time)
-        self.__eventdata.append(kwargs)
-
-        if time > self.__largest_time:
-            self.__largest_time = time
-
-        return self[eventID]
-
-
-    def NextEvent(self):
-        # find index of next event
-        timediff = np.array([t - self.__current_time if t > self.__current_time else self.__largest_time for t in self.__eventtime ]) # set all negative values of the calculation to the maximal time, self.__largest_time
-        idx = timediff.argmin()
-        
-        # set the current status 
-        self.__current_time = self.__eventtime[idx]
-        self.__current_eventID = idx
-        
-        return self[idx]
-
-    
-    def EventTimes(self,first = None, uptocurrent = False):
-        d = np.sort(self.times)
-
-        if uptocurrent:
-            d = d[d<self.curtime]
-
-        if not first is None:
-            if len(d) < first:
-                d = d[:first]
-
-        return d
-    
-    
-    # return internal variables
-    def __getattr__(self,key):
-        if  key == "times":
-            return np.sort(np.array(self.__eventtime))
-        elif key == "curtime":
-            return self.__current_time
-
-
-    # output should be generated over adressing an index in the list
-    def __getitem__(self,key):
-        if len(self.__eventdata) > key:
-            return key, self.__eventtime[key], self.__eventdata[key]
-        else:
-            raise KeyError
 
 
 
@@ -349,13 +312,6 @@ class DivisionTimes_2dARP(object):
         
         return divtime,daugtherstates
 
-    
-    def WriteDivTimesToFile(self,filename = 'divtimes.txt'):
-        fp = open(filename,'w')
-        for dt in self.recorded_DivTimes:
-            fp.write('{:.6f}\n'.format(dt))
-        fp.close()
-
 
     def __getattr__(self,key):
         if   key == 'variance':
@@ -376,9 +332,7 @@ class Population(object):
         self.__initialpopulationsize = kwargs.get("initialpopulationsize",5)
         self.__populationsize        = self.__initialpopulationsize
         
-        if int(kwargs.get('EventLine',1)) == 0:  self.events = EventLine(verbose = self.__verbose)
-        else:                                    self.events = EventLineLL(verbose = self.__verbose) # default behavior is linked list
-
+        self.events                  = EventLineLL(verbose = self.__verbose) # default behavior is linked list, data extraction not implemented in old eventline
         self.divtimes                = DivisionTimes_2dARP(**kwargs)
         self.graphoutput             = kwargs.get("graphoutput",False)
         
@@ -463,15 +417,18 @@ class Population(object):
     def __getattr__(self,key):
         if   key == 'size':
             return int(self)
+        elif key == 'time':
+            return self.events.curtime
         elif key == 'divisiontimes':
             return self.divtimes.divisiontimes
         elif key == 'founderdivisiontimes':
             return self.divtimes.divisiontimes[:self.__initialpopulationsize]
-        elif key == 'divisiondata':
-            d = self.divisiontimes
-            t = self.events.times[:len(d)]
-            s = np.arange(len(d)) + self.__initialpopulationsize + 1
-            return pd.DataFrame({'times':t, 'divisiontimes': d, 'populationsize': s})
+        elif key == 'data':
+            eventdata = self.events.data
+            divtimes  = self.divisiontimes
+            popsize   = np.arange(len(divtimes)) + self.__initialpopulationsize + 1
+            divtimedf = pd.DataFrame({'#populationsize' : popsize, 'divisiontime' : divtimes})
+            return pd.concat([divtimedf, eventdata.reindex(divtimedf.index)], axis=1)
             
     
 
@@ -510,7 +467,7 @@ def MakeDictFromParameterList(params):
 def main():
     parser = argparse.ArgumentParser()
     parser_IO = parser.add_argument_group(description = "==== I/O parameters ====")
-    parser_IO.add_argument("-o","--outputfile",    default = None,  type = str)
+    parser_IO.add_argument("-o","--outputfile",    default = 'popdata.txt',  type = str)
     parser_IO.add_argument("-G","--graphoutput",   default = False, action = "store_true")
     parser_IO.add_argument("-I","--ignoreParents", default = False, action = "store_true")
     parser_IO.add_argument("-v","--verbose",       default = False, action = "store_true")
@@ -533,16 +490,16 @@ def main():
     pop = Population(**argument_dict)
     
     # write standard parameters of divition time distribution
-    print('# stationary values: {} {}\n'.format(pop.divtimes.mean, pop.divtimes.variance))
+    if args.verbose:
+        print('# stationary values division time distribution: {} {}\n'.format(pop.divtimes.mean, pop.divtimes.variance))
     
     # growth
     while pop.size < args.maxSize:
         pop.growth()
-        print("{:s}\n".format(str(pop)))
-    
+        print("{:.3f} {:5d}".format(pop.time, pop.size))
+
     # save output
-    if not args.outputfile is None:
-        pop.divisiondata.to_csv(args.outputfile,sep = ' ',header = ['#time', 'divisiontime', 'populationsize'])
+    pop.data.to_csv(args.outputfile, sep = ' ', index = False)
 
 
 
