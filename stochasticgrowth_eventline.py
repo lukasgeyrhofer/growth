@@ -386,7 +386,10 @@ class Population(object):
         
         growthtimes,states = self.divtimes.DrawDivisionTimes(size = self.__initialpopulationsize)
         for i in range(self.__initialpopulationsize):
-            remaining_growthtime = np.random.uniform(high = growthtimes[i])
+            if not kwargs.get("SyncInitialDivision",False):
+                remaining_growthtime = np.random.uniform(high = growthtimes[i])
+            else:
+                remaining_growthtime = growthtimes[i]
             self.events.AddEvent(time = remaining_growthtime, parentID = -1, parentstate = states[i])
             if self.graphoutput:
                 self.graph.add_nodes_from([i])
@@ -516,6 +519,7 @@ def main():
     parser_alg.add_argument("-n", "--initialpopulationsize", type = int, default = 5)
     parser_alg.add_argument("-N", "--maxSize",               type = int, default = 100)
     parser_alg.add_argument("-P", "--parameters",            nargs = "*", default = None)
+    parser_alg.add_argument("-S", "--SyncInitialDivision",   default = False, action = "store_true")
     args = parser.parse_args()
 
     argument_dict = vars(args)
