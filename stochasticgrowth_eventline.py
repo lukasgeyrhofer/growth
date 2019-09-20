@@ -467,7 +467,7 @@ class Population(object):
         elif key == 'divisiondata':
             d = self.divisiontimes
             t = self.events.times[:len(d)]
-            s = np.arange(len(d))
+            s = np.arange(len(d)) + self.__initialpopulationsize + 1
             return pd.DataFrame({'times':t, 'divisiontimes': d, 'populationsize': s})
             
     
@@ -534,12 +534,11 @@ def main():
     # growth
     while pop.size < args.maxSize:
         pop.growth()
-        out.write("{:s}\n".format(str(pop)))
+        print("{:s}\n".format(str(pop)))
     
-    # output
-    out.close()
-    if not args.divtimefile is None:
-        pop.divisiondata.to_csv(args.outputfile)
+    # save output
+    if not args.outputfile is None:
+        pop.divisiondata.to_csv(args.outputfile,sep = ' ',header = ['#time', 'divisiontime', 'populationsize'])
 
 
 
