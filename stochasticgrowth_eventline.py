@@ -202,7 +202,6 @@ class EventLineLL(object):
 
     def LineageData(self, ID):
         n = self[ID]
-        print(n)
         df = self.DataFrameAppend(None,n)
         while not n.parent_ref is None:
             n = n.parent_ref
