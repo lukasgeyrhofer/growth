@@ -48,7 +48,7 @@ class EventLineLL(object):
         self.__init__(**self.__store_for_reset)
 
 
-    def EventData(self,e = None):
+    def EventData(self, e = None):
         # format output for 'Population' object
         if not e is None:
             return e.ID, e.time, e.data
@@ -149,7 +149,7 @@ class EventLineLL(object):
         return self.EventData(self.__current_ref)
 
 
-    def EventTimes(self,first = None):
+    def EventTimes(self, first = None):
         # backward compatibility
         return self.GenerateListOfTimes()
     
@@ -162,16 +162,8 @@ class EventLineLL(object):
             n=n.next_ref
         return np.array(lot,dtype=np.float)
 
-    def GenerateListOfData(self):
-        df = None
-        n = self.__start_ref
-        df = pd.DataFrame(n.data)
-        while not n is None:
-            n=n.next_ref
-            df.append(n.data)
-        return df
 
-    def ExpandDict(self,d):
+    def ExpandDict(self, d):
         r = dict()
         for key,value in d.items():
             if not isinstance(value,(list,tuple,np.ndarray)):
@@ -186,9 +178,38 @@ class EventLineLL(object):
         curdata = {'ID':[e.ID],'time':[e.time]}
         curdata.update(self.ExpandDict(e.data))
         return curdata
+    
+    
+    def DataFrameAppend(self, dataframe, event):
+        if dataframe is None:
+            dataframe = pd.DataFrame(self.EventToDict(event))
+        else:
+            dataframe = dataframe.append(pd.DataFrame(self.EventToDict(event)),ignore_index = True)
+        return dataframe
+    
+    
+    def CurrentPopulationData(self):
+        df = None
+        if not self.__start_ref is None:
+            n = self.__start_ref
+            while not n is None:
+                if not n.daughter_ref[0] is None:
+                    if n.time < self.curtime and n.daughter_ref[0].time > self.curtime and n.daughter_ref[1].time > self.curtime:
+                        df = self.DataFrameAppend(df,n)
+                n = n.next_ref
+        return df
 
 
-    def __getattr__(self,key):
+    def LinageData(self, ID):
+        n = self[ID]
+        df = self.DataFrameAppend(None,n)
+        while not n.parent_ref is None:
+            n = n.parent_ref
+            df = self.DataFrameAppend(df,n)
+        return df
+        
+
+    def __getattr__(self, key):
         if key  == 'times':
             return self.GenerateListOfTimes()
         elif key == 'curtime':
@@ -199,14 +220,14 @@ class EventLineLL(object):
         elif key == 'data':
             n = self.__start_ref
             if not n is None:
-                df = pd.DataFrame(self.EventToDict(n))
+                df = self.DataFrameAppend(None, n)
                 while n != self.__current_ref:
                     n = n.next_ref
-                    df = df.append(pd.DataFrame(self.EventToDict(n)), ignore_index = True)
+                    df = self.DataFrameAppend(df,n)
             return df
 
 
-    def __getitem__(self,key):
+    def __getitem__(self, key):
         # also backward compatibility, accessing a particular event via its ID is probably not the best idea
         e = self.__start_ref
         while e.ID != key:
