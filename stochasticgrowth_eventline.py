@@ -200,7 +200,7 @@ class EventLineLL(object):
         return df
 
 
-    def LinageData(self, ID):
+    def LineageData(self, ID):
         n = self[ID]
         df = self.DataFrameAppend(None,n)
         while not n.parent_ref is None:
