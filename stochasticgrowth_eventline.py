@@ -202,6 +202,7 @@ class EventLineLL(object):
 
     def LineageData(self, ID):
         n = self[ID]
+        print(n)
         df = self.DataFrameAppend(None,n)
         while not n.parent_ref is None:
             n = n.parent_ref
@@ -234,9 +235,9 @@ class EventLineLL(object):
             if not e.next_ref is None: e = e.next_ref
             else: break
         if e.ID == key:
-            return self.EventData(e)
+            return e
         else:
-            return self.EventData(None)
+            return None
 
 
     def __str__(self):
