@@ -200,6 +200,17 @@ class EventLineLL(object):
         return df
 
 
+    def FounderPopulationData(self):
+        df = None
+        if not self.__start_ref in None:
+            n = self.__start_ref
+            while not n is None:
+                if n.parent_ref is None:
+                    df = self.DataFrameAppend(df,n)
+                n = n.next_ref
+        return df
+
+
     def LineageData(self, ID):
         n = self[ID]
         df = self.DataFrameAppend(None,n)
