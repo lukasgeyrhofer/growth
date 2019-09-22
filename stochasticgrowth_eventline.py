@@ -275,33 +275,51 @@ class DivisionTimes_flat(object):
 class DivisionTimes_2dARP(object):
     def __init__(self,**kwargs):
         # distribution of division times
-        self.__divtime_min     = kwargs.get('divtime_min',.1)
-        self.__divtime_mean    = kwargs.get('divtime_mean',1)
-        self.__divtime_var     = kwargs.get('divtime_var',.01)
-        self.recorded_DivTimes = list()
+        self.__divtime_min            = kwargs.get('divtime_min',.1)
+        self.__divtime_mean           = kwargs.get('divtime_mean',1)
+        self.__divtime_var            = kwargs.get('divtime_var',.01)
+        self.recorded_DivTimes        = list()
         
-        # dynamics of internal state
-        self.__eigenvalues     = np.array(kwargs.get('eigenvalues',[.3,.9]),dtype=np.float)
-        self.__beta            = kwargs.get('beta',.3)
-        self.__alpha           = kwargs.get('alpha',.6)
-        self.__noiseamplitude  = kwargs.get('noiseamplitude',.6)
-        
-        self.A                 = np.array([[self.__eigenvalues[1],0],[(self.__eigenvalues[0] - self.__eigenvalues[1])/np.tan(2*np.pi*self.__beta),self.__eigenvalues[0]]],dtype=np.float)
-        self.__stationaryCov   = self.ComputeStationaryCovariance()
-        self.projection        = np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
-        self.projection       *= np.sqrt(self.__divtime_var/self.variance)
+        if kwargs.get("inheritancematrix",None) is None:
+            # dynamics of internal state
+            self.__eigenvalues        = np.array(kwargs.get('eigenvalues',[.3,.9]),dtype=np.float)
+            self.__beta               = kwargs.get('beta',.3)
+            
+            self.A                    = np.array([[self.__eigenvalues[1],0],[(self.__eigenvalues[0] - self.__eigenvalues[1])/np.tan(2*np.pi*self.__beta),self.__eigenvalues[0]]],dtype=np.float)
+            self.__iterateInheritance = False
+        else:
+            self.A                    = np.array(kwargs.get("inheritancematrix"),dtype=np.float)
+            self.__iterateInheritance = True
+            
+        self.__alpha                  = kwargs.get('alpha',.6)
+        self.__noiseamplitude         = kwargs.get('noiseamplitude',.6)
+
+        self.__stationaryCov          = self.ComputeStationaryCovariance()
+        self.projection               = np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
+        self.projection              *= np.sqrt(self.__divtime_var/self.variance)
         
         # debug mode
-        self.__ignore_parents = kwargs.get('ignoreParents',False)
+        self.__ignore_parents         = kwargs.get('ignoreParents',False)
         
         
     def ComputeStationaryCovariance(self):
-        il1l1 = 1./(1-self.__eigenvalues[0]**2)
-        il2l2 = 1./(1-self.__eigenvalues[1]**2)
-        il1l2 = 1./(1-self.__eigenvalues[0]*self.__eigenvalues[1])
-        itan  = 1./np.tan(2 * np.pi * self.__beta)
-        return self.__noiseamplitude**2 * np.array([[ il2l2,                  (il1l2 - il2l2) * itan],
-                                                    [ (il1l2 - il2l2) * itan, il1l1 + (il1l1 - 2*il1l2 + il2l2)*itan*itan]], dtype = np.float)
+        if self.__iterateInheritance:
+            # iteratively compute sum_m A^m (A.T)^m
+            maxiterations = 100
+            r   = np.eye(2)
+            cur = np.eye(2)
+            for i in range(1,maxiterations):
+                cur = np.matmul(self.A,np.matmul(cur,self.A.T))
+                r  += cur
+            return self.__noiseamplitude**2 * r
+        else:
+            # analytic solution based on geometric series
+            il1l1 = 1./(1-self.__eigenvalues[0]**2)
+            il2l2 = 1./(1-self.__eigenvalues[1]**2)
+            il1l2 = 1./(1-self.__eigenvalues[0]*self.__eigenvalues[1])
+            itan  = 1./np.tan(2 * np.pi * self.__beta)
+            return self.__noiseamplitude**2 * np.array([[ il2l2,                  (il1l2 - il2l2) * itan],
+                                                        [ (il1l2 - il2l2) * itan, il1l1 + (il1l1 - 2*il1l2 + il2l2)*itan*itan]], dtype = np.float)
 
     def TimeFromState(self,state):
         dt = np.max([self.__divtime_mean + np.dot(self.projection,state),self.__divtime_min])
