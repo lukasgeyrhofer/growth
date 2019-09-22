@@ -202,7 +202,7 @@ class EventLineLL(object):
 
     def FounderPopulationData(self):
         df = None
-        if not self.__start_ref in None:
+        if not self.__start_ref is None:
             n = self.__start_ref
             while not n is None:
                 if n.parent_ref is None:
