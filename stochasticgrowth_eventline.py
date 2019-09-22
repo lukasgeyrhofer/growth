@@ -282,6 +282,21 @@ class DivisionTimes_flat(object):
 
 
 
+def ConstructMatrix(eigenvalues = np.ones(2),theta = np.array([0,.25])):
+    # construct matrix from its 2 eigenvalues and the two angles determining the eigendirections
+    eigenvalues = np.array(eigenvalues,dtype=np.float)
+    theta       = np.array(theta,dtype = np.float) # assume theta in interval [0 ... 1]
+    ct          = np.cos(2*np.pi*theta)
+    st          = np.sin(2*np.pi*theta)
+    isdt        = 1./np.sin(2*np.pi*(theta[0] - theta[1]))
+    return isdt * np.array([[
+        (eigenvalues[0]*ct[1]*st[0] - eigenvalues[1]*ct[0]*st[1]),
+        (eigenvalues[0] - eigenvalues[1])*st[0]*st[1]],[
+        (eigenvalues[1] - eigenvalues[0])*ct[0]*ct[1],
+        (eigenvalues[1]*ct[1]*st[0] - eigenvalues[0]*ct[0]*st[1])
+    ]])
+
+
     
 class DivisionTimes_2dARP(object):
     def __init__(self,**kwargs):
