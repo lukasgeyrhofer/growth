@@ -26,6 +26,26 @@ class EventNode(object):
         self.data         = kwargs.get('data', None)
 
 
+    def to_dict(self, force_list_output = True):
+        curdata = {'ID':self.ID,'time':self.time}
+
+        # add all values in data to dictionary as well
+        for key,value in self.data.items():
+            if not isinstance(value,(list,tuple,np.ndarray)):
+                curdata.update({key:value})
+            else:
+                # if entry in data has more dimensions, then flatten it and enumerate keys
+                for i,vi in enumerate(value):
+                    curdata.update({key + str(i):vi})
+
+        # wrap each output element into list, such that the whole dictionary can be appended to pandas dataframe as new entry
+        if force_list_output:
+            for key,value in curdata.items():
+                curdata[key] = [value]
+
+        return curdata
+        
+
 
 class EventLineLL(object):
     def __init__(self,**kwargs):
@@ -72,7 +92,7 @@ class EventLineLL(object):
         if self.__start_ref is None:
             # first option is that nothing in the linked list exists sofar
             self.__start_ref = n
-            self.__end_ref = n
+            self.__end_ref   = n
             updated = True
         elif not self.__insert_from_last_event:
             # set pointer to first element and go through options
@@ -82,7 +102,7 @@ class EventLineLL(object):
                 e.last_ref       = n
                 n.next_ref       = e
                 self.__start_ref = n
-                updated = True
+                updated          = True
             else:
                 while e.time < time:
                     if e.next_ref is None:
@@ -90,54 +110,57 @@ class EventLineLL(object):
                         e.next_ref     = n
                         n.last_ref     = e
                         self.__end_ref = n
-                        updated = True
+                        updated        = True
                         break
                     else:
                         # continue iterating
-                        e = e.next_ref
+                        e              = e.next_ref
                 if not updated:
                     # just jumped to the item 'e' that has a time one step ahead of 'n', then the while loop stopped
-                    n.last_ref = e.last_ref
-                    n.next_ref = e
+                    n.last_ref          = e.last_ref
+                    n.next_ref          = e
                     e.last_ref.next_ref = n
-                    e.last_ref = n
+                    e.last_ref          = n
         else:
+            # start at last added event ...
             e = self.__last_added_event
             if e.time < time:
+                # ... then check for direction of going though linked list. either forward ...
                 while e.time < time:
                     if e.next_ref is None:
-                        e.next_ref = n
-                        n.last_ref = e
-                        self.__end_ref = n
-                        updated = True
+                        e.next_ref      = n
+                        n.last_ref      = e
+                        self.__end_ref  = n
+                        updated         = True
                         break
                     else:
-                        e = e.next_ref
+                        e               = e.next_ref
                 if not updated:
-                    n.last_ref = e.last_ref
-                    n.next_ref = e
+                    n.last_ref          = e.last_ref
+                    n.next_ref          = e
                     e.last_ref.next_ref = n
-                    e.last_ref = n
+                    e.last_ref          = n
             else:
+                # ... or go backward 
                 while e.time > time:
                     if e.last_ref is None:
-                        n.next_ref = e
-                        e.last_ref = n
+                        n.next_ref       = e
+                        e.last_ref       = n
                         self.__start_ref = n
-                        updated = True
+                        updated          = True
                         break
                     else:
-                        e = e.last_ref
+                        e                = e.last_ref
                 if not updated:
-                    e.next_ref.last_ref = n
-                    n.next_ref = e.next_ref
-                    e.next_ref = n
-                    n.last_ref = e
+                    e.next_ref.last_ref  = n
+                    n.next_ref           = e.next_ref
+                    e.next_ref           = n
+                    n.last_ref           = e
 
 
 
-        self.__nextID += 1
-        self.__last_added_event = n
+        self.__nextID           += 1
+        self.__last_added_event  = n
         return self.EventData(n)
 
 
@@ -159,35 +182,18 @@ class EventLineLL(object):
         n = self.__start_ref
         while not n is None:
             lot.append(n.time)
-            n=n.next_ref
+            n = n.next_ref
         return np.array(lot,dtype=np.float)
 
-
-    def ExpandDict(self, d):
-        r = dict()
-        for key,value in d.items():
-            if not isinstance(value,(list,tuple,np.ndarray)):
-                r.update({key:[value]})
-            else:
-                for i,vi in enumerate(value):
-                    r.update({key + str(i):[vi]})
-        return r
-
-
-    def EventToDict(self,e):
-        curdata = {'ID':[e.ID],'time':[e.time]}
-        curdata.update(self.ExpandDict(e.data))
-        return curdata
     
-    
+    # wrapper for pandas output
     def DataFrameAppend(self, dataframe, event):
-        if dataframe is None:
-            dataframe = pd.DataFrame(self.EventToDict(event))
-        else:
-            dataframe = dataframe.append(pd.DataFrame(self.EventToDict(event)),ignore_index = True)
+        if dataframe is None:   dataframe = pd.DataFrame(event.to_dict())
+        else:                   dataframe = dataframe.append(pd.DataFrame(event.to_dict()), ignore_index = True)
         return dataframe
     
     
+    # output various slices of the data
     def CurrentPopulationData(self):
         df = None
         if not self.__start_ref is None:
@@ -291,7 +297,7 @@ def ConstructMatrix(eigenvalues = np.ones(2),theta = np.array([0,.25])):
     isdt        = 1./np.sin(2*np.pi*(theta[0] - theta[1]))
     return isdt * np.array([[
         (eigenvalues[0]*ct[1]*st[0] - eigenvalues[1]*ct[0]*st[1]),
-        (eigenvalues[0] - eigenvalues[1])*st[0]*st[1]],[
+        (eigenvalues[0] - eigenvalues[1])*st[0]*st[1] ],[
         (eigenvalues[1] - eigenvalues[0])*ct[0]*ct[1],
         (eigenvalues[1]*ct[1]*st[0] - eigenvalues[0]*ct[0]*st[1])
     ]])
@@ -300,29 +306,38 @@ def ConstructMatrix(eigenvalues = np.ones(2),theta = np.array([0,.25])):
     
 class DivisionTimes_2dARP(object):
     def __init__(self,**kwargs):
+        
+        
+        print('hallo')
+        
         # distribution of division times
         self.__divtime_min            = kwargs.get('divtime_min',.1)
         self.__divtime_mean           = kwargs.get('divtime_mean',1)
         self.__divtime_var            = kwargs.get('divtime_var',.01)
         self.recorded_DivTimes        = list()
         
+        self.__noiseamplitude         = kwargs.get('noiseamplitude',.6)
+
+        
         if kwargs.get("inheritancematrix",None) is None:
-            # dynamics of internal state
+            # inheritance of internal state
+            self.__iterateInheritance = False # don't iterate, as expressions are available analytically
             self.__eigenvalues        = np.array(kwargs.get('eigenvalues',[.3,.9]),dtype=np.float)
             self.__beta               = kwargs.get('beta',.3)
-            
-            self.A                    = np.array([[self.__eigenvalues[1],0],[(self.__eigenvalues[0] - self.__eigenvalues[1])/np.tan(2*np.pi*self.__beta),self.__eigenvalues[0]]],dtype=np.float)
-            self.__iterateInheritance = False
+            print('hallo2')
+            self.A                    = ConstructMatrix(eigenvalues = self.__eigenvalues, theta = [0,self.__beta])
+
         else:
+            # inheritance matrix directly provided
             self.A                    = np.array(kwargs.get("inheritancematrix"),dtype=np.float)
             self.__iterateInheritance = True
             
-        self.__alpha                  = kwargs.get('alpha',.6)
-        self.__noiseamplitude         = kwargs.get('noiseamplitude',.6)
-
         self.__stationaryCov          = self.ComputeStationaryCovariance()
+        self.__alpha                  = kwargs.get('alpha',.6)
         self.projection               = np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
         self.projection              *= np.sqrt(self.__divtime_var/self.variance)
+        
+        print(self.__noiseamplitude)
         
         # debug mode
         self.__ignore_parents         = kwargs.get('ignoreParents',False)
@@ -444,7 +459,7 @@ class Population(object):
             for i in range(divisionevents):
                 self.division()
         elif not maxpopsize is None:
-            while int(self) <= maxpopsize:
+            while self.size <= maxpopsize:
                 self.division()
         elif not maxtime is None:
             while self.events.curtime <= maxtime:
@@ -481,7 +496,7 @@ class Population(object):
     
     def __getattr__(self,key):
         if   key == 'size':
-            return int(self)
+            return self.__populationsize
         elif key == 'time':
             return self.events.curtime
         elif key == 'divisiontimes':
