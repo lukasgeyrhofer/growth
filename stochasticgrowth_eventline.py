@@ -306,10 +306,6 @@ def ConstructMatrix(eigenvalues = np.ones(2),theta = np.array([0,.25])):
     
 class DivisionTimes_2dARP(object):
     def __init__(self,**kwargs):
-        
-        
-        print('hallo')
-        
         # distribution of division times
         self.__divtime_min            = kwargs.get('divtime_min',.1)
         self.__divtime_mean           = kwargs.get('divtime_mean',1)
@@ -324,7 +320,6 @@ class DivisionTimes_2dARP(object):
             self.__iterateInheritance = False # don't iterate, as expressions are available analytically
             self.__eigenvalues        = np.array(kwargs.get('eigenvalues',[.3,.9]),dtype=np.float)
             self.__beta               = kwargs.get('beta',.3)
-            print('hallo2')
             self.A                    = ConstructMatrix(eigenvalues = self.__eigenvalues, theta = [0,self.__beta])
 
         else:
@@ -336,8 +331,6 @@ class DivisionTimes_2dARP(object):
         self.__alpha                  = kwargs.get('alpha',.6)
         self.projection               = np.array([-np.sin(self.__alpha),np.cos(self.__alpha)],dtype=np.float)
         self.projection              *= np.sqrt(self.__divtime_var/self.variance)
-        
-        print(self.__noiseamplitude)
         
         # debug mode
         self.__ignore_parents         = kwargs.get('ignoreParents',False)
