@@ -21,14 +21,20 @@ class CorrelationStructure(object):
         
         self.dimensions = np.shape(self.A)[0]
         
-        self.__noisecorrelation = np.array(kwargs.get('noisecorrelation',1))
+        self.__noisecorrelation = np.array(kwargs.get('noisecorrelation',1),dtype = np.float)
+        print(type(self.__noisecorrelation))
         if isinstance(self.__noisecorrelation,(float,np.float)):
-            self.__noisecorrelation *= np.eye(self.dimensions)
+            
+            self.__noisecorrelation = self.__noisecorrelation * np.eye(self.dimensions)
         elif isinstance(self.__noisecorrelation,(np.ndarray)):
             if len(np.shape(self.__noisecorrelation)) == 1:
                 self.__noisecorrelation = np.diag(self.__noisecorrelation)
+            elif len(np.shape(self.__noisecorrelation)) == 0:
+                self.__noisecorrelation = self.__noisecorrelation * np.eye(self.dimensions)
 
-        self.StationaryCov = self.ComputeStationaryCovariance(maxiterations = kwargs.get('maxiterations',100))
+        print(self.__noisecorrelation)
+
+        self.StationaryCov = self.ComputeStationaryCovariance(maxiterations = kwargs.get('maxiterations',100), iterate = self.iterateInheritance)
 
     def Projection(self,projection_angle = None):
         if projection_angle is None:
@@ -53,8 +59,8 @@ class CorrelationStructure(object):
         return c
         
         
-    def ComputeStationaryCovariance(self,maxiterations = 100):
-        if not self.iterateInheritance and self.dimensions == 2:
+    def ComputeStationaryCovariance(self,maxiterations = 100, iterate = False):
+        if not iterate and self.dimensions == 2:
             # analytic solution based on geometric series
             # <x x.T> = sum_m A^m <xi xi.T> (A.T)^m
             
@@ -73,13 +79,14 @@ class CorrelationStructure(object):
             dd      = 1./((c2*s1 + c1*s2)**2)
                     
             sc      = np.zeros((2,2))
-            sc[0,0] = il1l1 * s1**2*(c2**2*n1+c1**2*n2) - 2 * il1l2 * c1*s1*(c1*n2*s1+c2*n1*s2)         + il2l2 * c1**2*(n2*s1**2+n1*s2**2)
-            sc[0,1] = il1l1 * (c2**2*n1+c1**2*n2)*s1*s2 -     il1l2 * (c2*s1+c1*s2)*(c1*n2*s1+c2*n1*s2) + il2l2 * c1*c2*(n2*s1**2+n1*s2**2)
-            sc[1,0] = sc[0,1]
-            sc[1,1] = il1l1 * (c2**2*n1+c1**2*n2)*s2**2 - 2 * il1l2 * c2*s2*(c1*n2*s1+c2*n1*s2)         + il2l2 * c2**2*(n2*s1**2+n1*s2**2)
+            sc[0,0] =   il1l1 * s1**2*(c2**2*n1+n2*s2**2) - 2 * il1l2 * s1*s2*(c1*c2*n1+n2*s1*s2)         + il2l2 * (c1**2*n1+n2*s1**2)*s2**2
+            sc[0,1] = - il1l1 * c1*s1*(c2**2*n1+n2*s2**2) +     il1l2 * (c2*s1+c1*s2)*(c1*c2*n1+n2*s1*s2) - il2l2 * c2*(c1**2*n1+n2*s1**2)*s2
+            sc[1,0] =   sc[0,1]
+            sc[1,1] =   il1l1 * c1**2*(c2**2*n1+n2*s2**2) - 2 * il1l2 * c1*c2*(c1*c2*n1+n2*s1*s2)         + il2l2 * c2**2*(c1**2*n1+n2*s1**2)
             sc     *= dd
-            
+            print('analytic')
         else:
+            print('iteration')
             # iteratively compute sum_m A^m (A.T)^m
             sc  = self.__noisecorrelation
             cur = self.__noisecorrelation
