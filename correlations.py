@@ -60,9 +60,10 @@ class CorrelationStructure(object):
         
         
     def ComputeStationaryCovariance(self,maxiterations = 100, iterate = False):
+        # stationary covariance given by
+        # <x x.T> = sum_m A^m <xi xi.T> (A.T)^m
         if not iterate and self.dimensions == 2:
             # analytic solution based on geometric series
-            # <x x.T> = sum_m A^m <xi xi.T> (A.T)^m
             
             il1l1   = 1./(1-self.__eigenvalues[0]**2)
             il2l2   = 1./(1-self.__eigenvalues[1]**2)
@@ -84,9 +85,7 @@ class CorrelationStructure(object):
             sc[1,0] =   sc[0,1]
             sc[1,1] =   il1l1 * c1**2*(c2**2*n1+n2*s2**2) - 2 * il1l2 * c1*c2*(c1*c2*n1+n2*s1*s2)         + il2l2 * c2**2*(c1**2*n1+n2*s1**2)
             sc     *= dd
-            print('analytic')
         else:
-            print('iteration')
             # iteratively compute sum_m A^m (A.T)^m
             sc  = self.__noisecorrelation
             cur = self.__noisecorrelation
