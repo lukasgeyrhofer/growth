@@ -14,10 +14,10 @@ class CorrelationStructure(object):
         
         if 'InheritanceMatrix' in kwargs.keys():
             self.A          = np.array(kwargs.get('InheritanceMatrix'), dtype = np.float)
-            self.__iterateInheritance = True
+            self.iterateInheritance = True
         else:
             self.A          = self.ConstructMatrix2D(eigenvalues = self.__eigenvalues, theta = self.__theta)
-            self.__iterateInheritance = True
+            self.iterateInheritance = False
         
         self.dimensions = np.shape(self.A)[0]
         
@@ -54,25 +54,41 @@ class CorrelationStructure(object):
         
         
     def ComputeStationaryCovariance(self,maxiterations = 100):
-        if self.__iterateInheritance:
+        if not self.iterateInheritance and self.dimensions == 2:
+            # analytic solution based on geometric series
+            # <x x.T> = sum_m A^m <xi xi.T> (A.T)^m
+            
+            il1l1   = 1./(1-self.__eigenvalues[0]**2)
+            il2l2   = 1./(1-self.__eigenvalues[1]**2)
+            il1l2   = 1./(1-self.__eigenvalues[0]*self.__eigenvalues[1])
+                    
+            c1      = np.cos(2*np.pi*self.__theta[0])
+            s1      = np.sin(2*np.pi*self.__theta[0])
+            c2      = np.cos(2*np.pi*self.__theta[1])
+            s2      = np.sin(2*np.pi*self.__theta[1])
+
+            n1      = self.__noisecorrelation[0,0]**2
+            n2      = self.__noisecorrelation[1,1]**2
+                    
+            dd      = 1./((c2*s1 + c1*s2)**2)
+                    
+            sc      = np.zeros((2,2))
+            sc[0,0] = il1l1 * s1**2*(c2**2*n1+c1**2*n2) - 2 * il1l2 * c1*s1*(c1*n2*s1+c2*n1*s2)         + il2l2 * c1**2*(n2*s1**2+n1*s2**2)
+            sc[0,1] = il1l1 * (c2**2*n1+c1**2*n2)*s1*s2 -     il1l2 * (c2*s1+c1*s2)*(c1*n2*s1+c2*n1*s2) + il2l2 * c1*c2*(n2*s1**2+n1*s2**2)
+            sc[1,0] = sc[0,1]
+            sc[1,1] = il1l1 * (c2**2*n1+c1**2*n2)*s2**2 - 2 * il1l2 * c2*s2*(c1*n2*s1+c2*n1*s2)         + il2l2 * c2**2*(n2*s1**2+n1*s2**2)
+            sc     *= dd
+            
+        else:
             # iteratively compute sum_m A^m (A.T)^m
-            r   = self.__noisecorrelation
+            sc  = self.__noisecorrelation
             cur = self.__noisecorrelation
             
             for i in range(maxiterations):
                 cur = np.matmul(self.A,np.matmul(cur,self.A.T))
-                r  += cur
+                sc += cur
             
-            return r
-
-        #else:
-            ## analytic solution based on geometric series
-            #il1l1 = 1./(1-self.__eigenvalues[0]**2)
-            #il2l2 = 1./(1-self.__eigenvalues[1]**2)
-            #il1l2 = 1./(1-self.__eigenvalues[0]*self.__eigenvalues[1])
-            #itan  = 1./np.tan(2 * np.pi * self.__beta)
-            #return self.__noiseamplitude**2 * np.array([[ il2l2,                  (il1l2 - il2l2) * itan],
-                                                        #[ (il1l2 - il2l2) * itan, il1l1 + (il1l1 - 2*il1l2 + il2l2)*itan*itan]], dtype = np.float)
+        return sc
         
     
     
