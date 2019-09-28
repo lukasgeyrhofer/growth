@@ -7,6 +7,92 @@ import sys,math
 
 import stochasticgrowth_eventline as sge
 
+import matplotlib.pyplot as plt
+
+def LMSQ(x,y):
+    n   = len(x)
+    sx  = np.sum(x)
+    sy  = np.sum(y)
+    sxx = np.dot(x,x)
+    sxy = np.dot(x,y)
+    syy = np.dot(y,y)
+    
+    denom  = (n*sxx-sx*sx)
+    b      = (n*sxy - sx*sy)/denom
+    a      = (sy-b*sx)/n
+    estim  = np.array([a,b],dtype=np.float)
+
+    sigma2 = syy + n*a*a + b*b*sxx + 2*a*b*sx - 2*a*sy - 2*b*sxy
+    cov    = sigma2 / denom * np.array([[sxx,-sx],[-sx,n]],dtype=np.float)
+
+    return estim,cov
+
+
+def GetCorrelation( alpha = .6, eigenvalue0 = .3, eigenvalue1=.9, theta0=0., theta1=.3, noiseamplitude0 = .6, noiseamplitude1 = .6 , fit = True, plot = True, logscale = True, maxtreedepth = 30):
+    
+    def doubledecayInterpNaturalParams(x,d0,d1,a):
+        return a * np.exp(-d0*x) + (1-a)*np.exp(-d1*x)    
+    
+    m       = np.arange(maxtreedepth)
+    cs      = CorrelationStructure(eigenvalues = [eigenvalue0,eigenvalue1], theta = [theta0,theta1], noiseamplitude = [noiseamplitude0,noiseamplitude1])
+    mdcorr  = cs.MDCorrelation    (size = maxtreedepth, projection_angle = alpha)
+    siscorr = cs.SisterCorrelation(size = maxtreedepth, projection_angle = alpha)
+
+    if plot:
+        plt.plot(m,mdcorr,  marker = 'o', lw = 1.5, c = 'orange')
+        plt.plot(m,siscorr, marker = 'o', lw = 1.5, c = 'blue')
+        if logscale:
+            plt.ylim((1e-5,1))
+            plt.yscale('log')
+        else:
+            plt.ylim((-.1,1))
+    
+    if fit:
+        secondtimescale = 15
+        mdcorr1  = mdcorr[secondtimescale:]
+        if mdcorr1[-1] < 0:
+            mdcorr1 *= -1
+            fitsignMD = -1
+        else:
+            fitsignMD = +1
+        mmd1 = (m[secondtimescale:])[mdcorr1 > 0]
+        mdcorr1  = mdcorr1[mdcorr1 > 0]
+        
+        siscorr1  = siscorr[secondtimescale:]
+        if siscorr1[-1] < 0:
+            siscorr1 *= -1
+            fitsignSIS  = -1
+        else:
+            fitsignSIS  = +1
+        ms1 = (m[secondtimescale:])[siscorr1 > 0]
+        siscorr1  = siscorr1[siscorr1 > 0]
+        
+        decay1_sis,cov1_sis = LMSQ(ms1, np.log(siscorr1))
+        decay1_md, cov1_md  = LMSQ(mmd1,np.log(mdcorr1))
+        
+        mdcorr2 = (mdcorr - fitsignMD * np.exp(decay1_md[0] + m * decay1_md[1]))[:secondtimescale]
+        mmd2    = (m[:secondtimescale])[mdcorr2 > 0]
+        mdcorr2  = mdcorr2[mdcorr2 > 0]
+        
+        siscorr2 = (siscorr     - fitsignSIS * np.exp(decay1_sis[0] + m * decay1_sis[1]))[:secondtimescale]
+        ms2      = (m[:secondtimescale])[siscorr2 > 0]
+        siscorr2  = siscorr2[siscorr2 > 0]
+        
+        decay2_sis,cov2_sis = LMSQ(ms2, np.log(siscorr2))
+        decay2_md, cov2_md  = LMSQ(mmd2,np.log(mdcorr2))
+
+        if plot:
+            x = np.linspace(0,maxtreedepth,200)
+            plt.plot(x,doubledecayInterpNaturalParams(x,-decay2_sis[1],-decay1_sis[1],1 - fitsignSIS * np.exp(decay1_sis[0])), c = 'darkorange')
+            plt.plot(x,doubledecayInterpNaturalParams(x,-decay2_md[1], -decay1_md[1], 1 - fitsignMD  * np.exp(decay1_MD[0])),  c = 'darkblue')
+    
+    
+        return np.array([-decay2_sis[1],-decay1_sis[1],1 - fitsignSIS * np.exp(decay1_sis[0]),-decay2_md[1],-decay1_md[1],1 - fitsignMD * np.exp(decay1_md[0])])
+    else:
+        return None 
+
+
+
 class CorrelationStructure(object):
     def __init__(self,**kwargs):
         self.__eigenvalues = kwargs.get('eigenvalues',[.3,.9])
@@ -22,7 +108,7 @@ class CorrelationStructure(object):
         self.dimensions = np.shape(self.A)[0]
         
         self.__noisecorrelation = np.array(kwargs.get('noisecorrelation',1),dtype = np.float)
-        print(type(self.__noisecorrelation))
+        #print(type(self.__noisecorrelation))
         if isinstance(self.__noisecorrelation,(float,np.float)):
             
             self.__noisecorrelation = self.__noisecorrelation * np.eye(self.dimensions)
@@ -32,7 +118,7 @@ class CorrelationStructure(object):
             elif len(np.shape(self.__noisecorrelation)) == 0:
                 self.__noisecorrelation = self.__noisecorrelation * np.eye(self.dimensions)
 
-        print(self.__noisecorrelation)
+        #print(self.__noisecorrelation)
 
         self.StationaryCov = self.ComputeStationaryCovariance(maxiterations = kwargs.get('maxiterations',100), iterate = self.iterateInheritance)
 
@@ -42,13 +128,8 @@ class CorrelationStructure(object):
         return np.array([-np.sin(2*np.pi*projection_angle),np.cos(2*np.pi*projection_angle)],dtype = np.float)
 
         
-    def Correlation(self,lineage = [0,0], projection_angle = None, projection = None):
-        if projection_angle is None:
-            if projection is None:
-                projection = self.Projection()
-        else:
-            projection = self.Projection(projection_angle = projection_angle)
-        
+    def Correlation(self,lineage = [0,0], projection_angle = None):
+        projection = self.Projection(projection_angle = projection_angle)
         
         c     = self.StationaryCov.copy()
         for l in range(lineage[0]): c = np.matmul(self.A,c)
@@ -57,6 +138,12 @@ class CorrelationStructure(object):
         c    /= np.dot(projection,np.dot(self.StationaryCov,projection))
         
         return c
+
+    def MDCorrelation(self, size = 5, projection_angle = None):
+        return np.array([self.Correlation(lineage = (0,m), projection_angle = projection_angle) for m in range(size)],dtype = np.float)
+    
+    def SisterCorrelation(self, size = 5, projection_angle = None):
+        return np.array([self.Correlation(lineage = (m,m), projection_angle = projection_angle) for m in range(size)],dtype = np.float)
         
         
     def ComputeStationaryCovariance(self,maxiterations = 100, iterate = False):
@@ -112,6 +199,10 @@ class CorrelationStructure(object):
             (eigenvalues[1]*ct[1]*st[0] - eigenvalues[0]*ct[0]*st[1])
         ]])
 
+
+    def MD_CC_Inequality(self,projection_angle = None):
+        return int(self.Correlation(lineage = (0,1),projection_angle = projection_angle) < self.Correlation(lineage = (2,2), projection_angle = projection_angle))
+    
 
     
 def main():
