@@ -63,6 +63,7 @@ class EventLineLL(object):
         self.__last_added_event       = None # last added event
         self.__insert_from_last_event = kwargs.get('InsertFromLast',True)
 
+        self.__have_return_dataframe  = False
     
     def Reset(self):
         self.__init__(**self.__store_for_reset)
@@ -77,7 +78,10 @@ class EventLineLL(object):
 
 
     def AddEvent(self, time = None, **kwargs):
-        updated = False
+        self.__have_return_dataframe = False # event list changed, need to compute dataframe from 'self.data' again
+        updated                      = False
+        
+        
         # create event ... assume parent is the event that 'current_ref' points to
         n = EventNode(ID = self.__nextID, time = time, data = kwargs, parent_ref = self.__current_ref)
         
@@ -165,6 +169,7 @@ class EventLineLL(object):
 
 
     def NextEvent(self):
+        self.__have_return_dataframe = False # pointer in time changes, need to compute dataframe 'self.data' again
         if self.__current_ref is None:
             self.__current_ref = self.__start_ref
         else:
@@ -235,13 +240,16 @@ class EventLineLL(object):
             else:
                 return 0
         elif key == 'data':
-            n = self.__start_ref
-            if not n is None:
-                df = self.DataFrameAppend(None, n)
-                while n != self.__current_ref:
-                    n = n.next_ref
-                    df = self.DataFrameAppend(df,n)
-            return df
+            if not self.__have_return_dataframe:
+                n = self.__start_ref
+                if not n is None:
+                    df = self.DataFrameAppend(None, n)
+                    while n != self.__current_ref:
+                        n = n.next_ref
+                        df = self.DataFrameAppend(df,n)
+                self.__return_dataframe      = df
+                self.__have_return_dataframe = True
+            return self.__return_dataframe
 
 
     def __getitem__(self, key):
