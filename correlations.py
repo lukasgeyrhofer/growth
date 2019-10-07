@@ -108,17 +108,13 @@ class CorrelationStructure(object):
         self.dimensions = np.shape(self.A)[0]
         
         self.__noisecorrelation = np.array(kwargs.get('noisecorrelation',1),dtype = np.float)
-        #print(type(self.__noisecorrelation))
         if isinstance(self.__noisecorrelation,(float,np.float)):
-            
             self.__noisecorrelation = self.__noisecorrelation * np.eye(self.dimensions)
         elif isinstance(self.__noisecorrelation,(np.ndarray)):
             if len(np.shape(self.__noisecorrelation)) == 1:
                 self.__noisecorrelation = np.diag(self.__noisecorrelation)
             elif len(np.shape(self.__noisecorrelation)) == 0:
                 self.__noisecorrelation = self.__noisecorrelation * np.eye(self.dimensions)
-
-        #print(self.__noisecorrelation)
 
         self.StationaryCov = self.ComputeStationaryCovariance(maxiterations = kwargs.get('maxiterations',100), iterate = self.iterateInheritance)
 
