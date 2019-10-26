@@ -57,6 +57,53 @@ def ConstructMatrix(eigenvalues = np.ones(2),theta = np.array([0,.25])):
     ]])
 
 
+def ConstructRotationMatrix(angles = [0]):
+    def RotM(angle):
+        return np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]],dtype = np.float)
+    
+    for i,angle in enumerate(angles):
+        if i == 0:
+            r = RotM(angle)
+        else:
+            
+
+
+class DivisionTimes_matrix(DivisionTimes):
+    def __init__(self,**kwargs):
+        super(DivisionTimes_matrix,self).__init__(kwargs)
+        
+        if not kwargs.get('inheritancematrix',None) is None:
+            self.inheritancematrix     = np.array(kwargs.get('inheritancematrix'),dtype=np.float)
+            self.dimension_shape       = np.shape(self.inheritancematrix)
+        
+            # check if square 2d matrix, otherwise convert
+            if len(self.dimension_shape) != 2 or self.dimension_shape[0] != self.dimension_shape[1]:
+                self.inheritancematrix = np.flatten(self.inheritancematrix)
+                self.dimensions        = np.sqrt(len(self.inheritancematrix))
+                self.inheritancematrix = np.reshape(self.inheritancematrix, (self.dimensions,self.dimensions))
+        else:
+            self.eigenvalues = np.array(kwargs.get('eigenvalues',[.3,.9]),dtype=np.float)
+            self.dimensions  = len(self.eigenvalues)
+            
+            self.eigenvectors = list()
+            
+            if not kwargs.get('matrixangles',None) is None:
+                self.matrixangles = kwargs.get('matrixangles')
+                if not self.dimensions == 2:
+                    raise NotImplementedError('matrix construction via eigenvector angles only implemented for 2d')
+                for angle in self.matrixangles:
+                    self.eigenvectors.append(np.array([np.cos(angle),-np.sin(angle)],dtype=np.float))
+            else:
+                self.eigenvectors = np.array(kwargs.get('eigenvectors',np.eye(self.dimensions)),dtype=np.float).reshape((self.dimensions,self.dimensions))
+            
+            for i in range(self.dimensions):
+                self.eigenvectors[:,i] /= np.linalg.norm(self.eigenvectors[:,i])
+            
+            self.inheritancematrix = np.matmul(self.eigenvectors,np.matmul(np.diag(self.eigenvalues),np.linalg.inv(self.eigenvectors)))
+        
+        
+        self.projection = np.array(kwargs.get('projection',[1,0]),dtype=np.float)
+        
 
     
 class DivisionTimes_2dARP(DivisionTimes):
