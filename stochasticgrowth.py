@@ -22,7 +22,7 @@ class Population(object):
         self.__populationsize        = self.__initialpopulationsize
         
         self.events                  = ec.EventLineLL(verbose = self.__verbose) # default behavior is linked list, data extraction not implemented in old eventline
-        self.divtimes                = ic.DivisionTimes_2dARP(**kwargs)
+        self.divtimes                = ic.DivisionTimes_matrix(**kwargs)
         self.graphoutput             = kwargs.get("graphoutput",False)
         
         self.graph                   = nx.Graph()

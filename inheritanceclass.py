@@ -16,10 +16,10 @@ class DivisionTimes(object):
     '''
     
     def __init__(self,**kwargs):
-        self.__min_divtime     = kwargs.get("mindivtime",None)
-        self.__avg_divtime     = kwargs.get("avgdivtime",2.)
-        self.__var_divtime     = kwargs.get("vardivtime",1.)
-        self.__stddev_divtime  = np.sqrt(self.__vardivtime)
+        self.min_divtime     = kwargs.get("mindivtime",0)
+        self.avg_divtime     = kwargs.get("avgdivtime",2.)
+        self.var_divtime     = kwargs.get("vardivtime",1.)
+        self.stddev_divtime  = np.sqrt(self.var_divtime)
 
         self.recorded_DivTimes = list()
 
@@ -33,9 +33,9 @@ class DivisionTimes(object):
 
     def __getattr__(self,key):
         if   key == 'variance':
-            return self.__var_divtime
+            return self.var_divtime
         elif key == 'mean':
-            return self.__avg_divtime
+            return self.avg_divtime
         elif key == 'divisiontimes':
             return np.array(self.recorded_DivTimes, dtype = np.float)
 
@@ -57,20 +57,16 @@ def ConstructMatrix(eigenvalues = np.ones(2),theta = np.array([0,.25])):
     ]])
 
 
-def ConstructRotationMatrix(angles = [0]):
-    def RotM(angle):
-        return np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]],dtype = np.float)
+def RotM(angle):
+    return np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]],dtype = np.float)
     
-    for i,angle in enumerate(angles):
-        if i == 0:
-            r = RotM(angle)
-        else:
-            
 
 
 class DivisionTimes_matrix(DivisionTimes):
     def __init__(self,**kwargs):
-        super(DivisionTimes_matrix,self).__init__(kwargs)
+        super(DivisionTimes_matrix,self).__init__(**kwargs)
+        
+        self.__maxiterations_cov = kwargs.get('maxiterations_cov',200)
         
         if not kwargs.get('inheritancematrix',None) is None:
             self.inheritancematrix     = np.array(kwargs.get('inheritancematrix'),dtype=np.float)
@@ -82,29 +78,64 @@ class DivisionTimes_matrix(DivisionTimes):
                 self.dimensions        = np.sqrt(len(self.inheritancematrix))
                 self.inheritancematrix = np.reshape(self.inheritancematrix, (self.dimensions,self.dimensions))
         else:
-            self.eigenvalues = np.array(kwargs.get('eigenvalues',[.3,.9]),dtype=np.float)
+            self.eigenvalues = np.array(kwargs.get('eigenvalues',[.3,.9]), dtype = np.float)
             self.dimensions  = len(self.eigenvalues)
             
-            self.eigenvectors = list()
-            
-            if not kwargs.get('matrixangles',None) is None:
-                self.matrixangles = kwargs.get('matrixangles')
+            if not kwargs.get('eigenvectors',None) is None:
+                self.eigenvectors = np.array(kwargs.get('eigenvectors'),dtype = np.float).reshape((self.dimensions,self.dimensions), order = 'F')
+            else:
+                self.matrixangles = np.array(kwargs.get('matrixangles',[0,.3]),dtype = np.float)
+                self.eigenvectors = np.zeros((self.dimensions,self.dimensions))
                 if not self.dimensions == 2:
                     raise NotImplementedError('matrix construction via eigenvector angles only implemented for 2d')
-                for angle in self.matrixangles:
-                    self.eigenvectors.append(np.array([np.cos(angle),-np.sin(angle)],dtype=np.float))
-            else:
-                self.eigenvectors = np.array(kwargs.get('eigenvectors',np.eye(self.dimensions)),dtype=np.float).reshape((self.dimensions,self.dimensions))
+                for i,angle in enumerate(self.matrixangles):
+                    self.eigenvectors[:,i]  = np.array([np.cos(2 * np.pi * angle),-np.sin(2 * np.pi * angle)],dtype=np.float)
             
             for i in range(self.dimensions):
                 self.eigenvectors[:,i] /= np.linalg.norm(self.eigenvectors[:,i])
             
             self.inheritancematrix = np.matmul(self.eigenvectors,np.matmul(np.diag(self.eigenvalues),np.linalg.inv(self.eigenvectors)))
         
+        self.noiseamplitude   = np.array(kwargs.get('noiseamplitudes', np.ones(self.dimensions)), dtype = np.float)
+        self.noisecov         = np.diag(self.noiseamplitude * self.noiseamplitude)
+        self.projection       = np.array(kwargs.get('projection',np.ones(self.dimensions)/(1.*self.dimensions)), dtype = np.float)
+        self.stationary_cov = self.ComputeStationaryCov()
         
-        self.projection = np.array(kwargs.get('projection',[1,0]),dtype=np.float)
+        self.__ignore_parents = kwargs.get('ignore_parents',False)
         
+    def ComputeStationaryCov(self):
+        r = self.noisecov.copy()
+        c = self.noisecov.copy()
+        for i in range(self.__maxiterations_cov):
+            c = np.matmul(self.inheritancematrix,np.matmul(c,self.inheritancematrix.T))
+            r += c
+        return r
 
+    def TimeFromState(self,state):
+        dt = np.max([self.avg_divtime + np.dot(self.projection,state),self.min_divtime])
+        return dt
+
+    def DrawDivisionTimes(self, parentstate = None, size = 2):
+        # get division time for two offspring cells
+        daugtherstates = list()
+        divtime        = list()
+        
+        # debug more: no inheritance should lead to stationary distribution
+        if self.__ignore_parents:
+            parentstate = None
+        
+        if parentstate is None:
+            for i in range(size):
+                daugtherstates.append(np.random.multivariate_normal(mean = np.zeros(self.dimensions), cov = self.__stationary_cov))
+        else:
+            for i in range(size):
+                daugtherstates.append(np.dot(self.inheritancematrix,parentstate) + self.noiseamplitude * np.random.normal(size = self.dimensions))
+
+        for state in daugtherstates:
+            divtime.append(self.TimeFromState(state))
+        
+        return divtime,daugtherstates
+            
     
 class DivisionTimes_2dARP(DivisionTimes):
     def __init__(self,**kwargs):
