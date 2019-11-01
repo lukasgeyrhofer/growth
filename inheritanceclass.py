@@ -17,8 +17,8 @@ class DivisionTimes(object):
     
     def __init__(self,**kwargs):
         self.min_divtime     = kwargs.get("mindivtime",0)
-        self.avg_divtime     = kwargs.get("avgdivtime",2.)
-        self.var_divtime     = kwargs.get("vardivtime",1.)
+        self.avg_divtime     = kwargs.get("avgdivtime",1.)
+        self.var_divtime     = kwargs.get("vardivtime",.2)
         self.stddev_divtime  = np.sqrt(self.var_divtime)
 
         self.recorded_DivTimes = list()
@@ -98,8 +98,11 @@ class DivisionTimes_matrix(DivisionTimes):
         
         self.noiseamplitude   = np.array(kwargs.get('noiseamplitudes', np.ones(self.dimensions)), dtype = np.float)
         self.noisecov         = np.diag(self.noiseamplitude * self.noiseamplitude)
-        self.projection       = np.array(kwargs.get('projection',np.ones(self.dimensions)/(1.*self.dimensions)), dtype = np.float)
-        self.stationary_cov = self.ComputeStationaryCov()
+        self.stationary_cov   = self.ComputeStationaryCov()
+        
+        self.projection       = np.array(kwargs.get('projection',np.ones(self.dimensions)), dtype = np.float)
+        self.projection      /= np.dot(self.projection,np.dot(self.stationary_cov,self.projection))
+                                # length of projection vector is set such that expected variance = 1
         
         self.__ignore_parents = kwargs.get('ignore_parents',False)
         
@@ -112,7 +115,7 @@ class DivisionTimes_matrix(DivisionTimes):
         return r
 
     def TimeFromState(self,state):
-        dt = np.max([self.avg_divtime + np.dot(self.projection,state),self.min_divtime])
+        dt = np.max([self.avg_divtime + self.stddev_divtime * np.dot(self.projection,state),self.min_divtime])
         return dt
 
     def DrawDivisionTimes(self, parentstate = None, size = 2):
