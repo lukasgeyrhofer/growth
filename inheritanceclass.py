@@ -16,10 +16,10 @@ class DivisionTimes(object):
     '''
     
     def __init__(self,**kwargs):
-        self.min_divtime     = kwargs.get("mindivtime",0)
-        self.avg_divtime     = kwargs.get("avgdivtime",1.)
-        self.var_divtime     = kwargs.get("vardivtime",.2)
-        self.stddev_divtime  = np.sqrt(self.var_divtime)
+        self.min_divtime       = kwargs.get("mindivtime",0)
+        self.avg_divtime       = kwargs.get("avgdivtime",1.)
+        self.var_divtime       = kwargs.get("vardivtime",.2)
+        self.stddev_divtime    = np.sqrt(self.var_divtime)
 
         self.recorded_DivTimes = list()
 
@@ -131,6 +131,7 @@ class DivisionTimes_matrix(DivisionTimes):
             for i in range(size):
                 daugtherstates.append(np.random.multivariate_normal(mean = np.zeros(self.dimensions), cov = self.stationary_cov))
         else:
+            self.recorded_DivTimes.append(self.TimeFromState(parentstate)) # cell just divided, record its divtime
             for i in range(size):
                 daugtherstates.append(np.dot(self.inheritancematrix,parentstate) + self.noiseamplitude * np.random.normal(size = self.dimensions))
 
