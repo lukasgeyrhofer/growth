@@ -5,7 +5,7 @@ import argparse
 import pandas as pd
 import sys,math
 
-import stochasticgrowth_eventline as sge
+import stochasticgrowth as sg
 
 import matplotlib.pyplot as plt
 
@@ -209,7 +209,7 @@ def main():
     
     argument_dict = vars(args)
     if not args.parameters is None:
-        argument_dict.update(sge.MakeDictFromParameterList(args.parameters))
+        argument_dict.update(sg.MakeDictFromParameterList(args.parameters))
         argument_dict.pop('parameters')
     
     cs = CorrelationStructure(**argument_dict)
