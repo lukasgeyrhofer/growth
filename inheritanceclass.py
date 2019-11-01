@@ -126,7 +126,7 @@ class DivisionTimes_matrix(DivisionTimes):
         
         if parentstate is None:
             for i in range(size):
-                daugtherstates.append(np.random.multivariate_normal(mean = np.zeros(self.dimensions), cov = self.__stationary_cov))
+                daugtherstates.append(np.random.multivariate_normal(mean = np.zeros(self.dimensions), cov = self.stationary_cov))
         else:
             for i in range(size):
                 daugtherstates.append(np.dot(self.inheritancematrix,parentstate) + self.noiseamplitude * np.random.normal(size = self.dimensions))
