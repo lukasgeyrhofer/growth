@@ -78,7 +78,7 @@ class DivisionTimes_matrix(DivisionTimes):
                 self.dimensions        = np.sqrt(len(self.inheritancematrix))
                 self.inheritancematrix = np.reshape(self.inheritancematrix, (self.dimensions,self.dimensions))
         else:
-            self.eigenvalues = np.array(kwargs.get('eigenvalues',[.3,.9]), dtype = np.float)
+            self.eigenvalues = np.array([kwargs.get('eigenvalues',[.3,.9])], dtype = np.float).flatten()
             self.dimensions  = len(self.eigenvalues)
             
             if not kwargs.get('eigenvectors',None) is None:
@@ -86,10 +86,15 @@ class DivisionTimes_matrix(DivisionTimes):
             else:
                 self.matrixangles = np.array(kwargs.get('matrixangles',[0,.3]),dtype = np.float)
                 self.eigenvectors = np.zeros((self.dimensions,self.dimensions))
-                if not self.dimensions == 2:
+                if self.dimensions == 1:
+                    self.eigenvectors = np.ones((1,1))
+                elif self.dimensions == 2:
+                    for i,angle in enumerate(self.matrixangles):
+                        self.eigenvectors[:,i]  = np.array([np.cos(2 * np.pi * angle),-np.sin(2 * np.pi * angle)],dtype=np.float)
+                elif len(self.matrixangles) == 2: # used default values, but dimension is not 2
+                    self.eigenvectors = np.eye(self.dimensions)
+                else:
                     raise NotImplementedError('matrix construction via eigenvector angles only implemented for 2d')
-                for i,angle in enumerate(self.matrixangles):
-                    self.eigenvectors[:,i]  = np.array([np.cos(2 * np.pi * angle),-np.sin(2 * np.pi * angle)],dtype=np.float)
             
             for i in range(self.dimensions):
                 self.eigenvectors[:,i] /= np.linalg.norm(self.eigenvectors[:,i])
