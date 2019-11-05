@@ -174,8 +174,8 @@ class EventLineLL(object):
         return self.GenerateListOfTimes()
     
     
-    def CurrentEventDict(self):
-        self.__current_ref.to_dict()
+    def CurrentEventDict(self,force_list_output = True):
+        return self.__current_ref.to_dict(force_list_output)
     
 
     def GenerateListOfTimes(self):
