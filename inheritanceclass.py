@@ -18,7 +18,7 @@ class DivisionTimes(object):
     def __init__(self,**kwargs):
         self.min_divtime       = kwargs.get("mindivtime",0)
         self.avg_divtime       = kwargs.get("avgdivtime",1.)
-        self.var_divtime       = kwargs.get("vardivtime",.2)
+        self.var_divtime       = kwargs.get("vardivtime",.04)
         self.stddev_divtime    = np.sqrt(self.var_divtime)
 
         self.recorded_DivTimes = list()
