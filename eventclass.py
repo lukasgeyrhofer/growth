@@ -173,6 +173,10 @@ class EventLineLL(object):
         # backward compatibility
         return self.GenerateListOfTimes()
     
+    
+    def CurrentEventDict(self):
+        self.__current_ref.to_dict()
+    
 
     def GenerateListOfTimes(self):
         lot = list()

@@ -27,6 +27,8 @@ class Population(object):
         
         self.graph                   = nx.Graph()
         
+        self.PopulationData          = None
+        
         growthtimes,states = self.divtimes.DrawDivisionTimes(size = self.__initialpopulationsize)
         for i in range(self.__initialpopulationsize):
             if not kwargs.get("SyncInitialDivision",False):
@@ -36,11 +38,13 @@ class Population(object):
             self.events.AddEvent(time = remaining_growthtime, parentID = -1, parentstate = states[i])
             if self.graphoutput:
                 self.graph.add_nodes_from([i])
-
+        
+        self.PopulationData          = self.events.FounderPopulationData()
         
     def division(self):
         # go to the next event in the eventline, initialize random variables
         curID, curtime, curdata = self.events.NextEvent()
+        self.PopulationData     = self.PopulationData.append(self.events.CurrentEventDict(), ignore_index = True)
         growthtimes,states      = self.divtimes.DrawDivisionTimes(parentstate = curdata['parentstate'])
         
         # add two new daugther cells to the eventline when they will divide in the future
@@ -113,11 +117,10 @@ class Population(object):
         elif key == 'founderdivisiontimes':
             return self.divtimes.divisiontimes[:self.__initialpopulationsize]
         elif key == 'data':
-            eventdata = self.events.data
             divtimes  = self.divisiontimes
             popsize   = np.arange(len(divtimes)) + self.__initialpopulationsize + 1
             divtimedf = pd.DataFrame({'#populationsize' : popsize, 'divisiontime' : divtimes})
-            return pd.concat([divtimedf, eventdata.reindex(divtimedf.index)], axis=1)
+            return pd.concat([divtimedf, self.PopulationData.reindex(divtimedf.index)], axis=1)
             
     
 
