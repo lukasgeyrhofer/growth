@@ -40,13 +40,11 @@ class Population(object):
                 self.graph.add_nodes_from([i])
         
         self.PopulationData          = self.events.FounderPopulationData().copy()
-        print(self.PopulationData)
         
     def division(self):
         # go to the next event in the eventline, initialize random variables
         curID, curtime, curdata = self.events.NextEvent()
         self.PopulationData     = self.PopulationData.append(self.events.CurrentEventDict(force_list_output = False), ignore_index = True)
-        #print(self.events.CurrentEventDict())
         growthtimes,states      = self.divtimes.DrawDivisionTimes(parentstate = curdata['parentstate'])
         
         # add two new daugther cells to the eventline when they will divide in the future
